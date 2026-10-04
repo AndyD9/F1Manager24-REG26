@@ -25,7 +25,7 @@ PATCHES = {
         ("OvertakeMaxStartDistance", 0, 40.0, 50.0),
     ],
     "DriverTacticsDataAsset": [
-        ("ERSDeployBudget", 0, 0.45, 0.50),
+        ("ERSDeployBudget", 0, 0.45, 0.80),
         ("OvertakeStrategyStatMultiplier", 0, 1.2, 1.3),
     ],
     "RaceSimAIDataAsset": [

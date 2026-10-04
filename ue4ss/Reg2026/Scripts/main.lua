@@ -68,7 +68,7 @@ end
 -- Le pak zzz_Reg2026_P ne gagne pas toujours : un autre mod qui contient les mêmes assets (RRacingV5 par
 -- exemple) peut passer devant, et nos valeurs ne sont alors jamais lues. On les écrit donc aussi directement
 -- dans les objets chargés, champ par champ : les autres réglages de l'autre mod restent en place.
--- Mêmes valeurs que scripts/patch_2026.py.
+-- Mêmes valeurs que scripts/patch_2026.py. Mesuré à Monza : sans RRacingV5, les valeurs sont bien en mémoire.
 local VALUES = {
     { "/Game/RaceSim/RaceSimDataAsset.RaceSimDataAsset", {
         { "ERSAccelDeployBatteryRate", -0.10 },
@@ -82,19 +82,15 @@ local VALUES = {
         { "OvertakeData.OvertakeMaxStartDistance", 50.0 },
     } },
     { "/Game/RaceSim/DriverTacticsDataAsset.DriverTacticsDataAsset", {
-        { "ERSDeployBudget", 0.50 },
+        { "ERSDeployBudget", 0.80 },
     } },
     { "/Game/SharedAssets/DataAssets/CarStatsDataAsset.CarStatsDataAsset", {
         { "CarStatWeights.TopSpeedWeights.PowerWeight", 0.15 },
         { "CarStatWeights.TopSpeedWeights.DragReductionWeight", 0.85 },
         { "CarStatWeights.AccelerationWeights.PowerWeight", 0.6 },
         { "CarStatWeights.AccelerationWeights.DragReductionWeight", 0.4 },
-        { "CarStatRanges.AeroSpeedMultipliers[1]", { 0.814, 0.945 } },
-        { "CarStatRanges.AeroSpeedMultipliers[2]", { 0.731, 0.95 } },
-        { "CarStatRanges.AeroSpeedMultipliers[3]", { 0.767, 0.92 } },
-        { "CarStatRanges.DirtyAirSpeedMultipliers[1]", { 0.93, 1.0 } },
-        { "CarStatRanges.DirtyAirSpeedMultipliers[2]", { 0.93, 1.0 } },
-        { "CarStatRanges.DirtyAirSpeedMultipliers[3]", { 0.93, 1.0 } },
+        -- AeroSpeedMultipliers et DirtyAirSpeedMultipliers (tableaux fixes de 3 FVector2D) : UE4SS ne sait pas
+        -- les indexer, seul le pak les apporte.
         { "CarStatRanges.DRSTopSpeedMultiplier", { 1.03, 1.06 } },
         { "CarStatRanges.DRSAccelerationMultiplier", { 1.05, 1.20 } },
     } },
