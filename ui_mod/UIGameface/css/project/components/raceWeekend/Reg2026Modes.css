@@ -31,13 +31,14 @@
 }
 
 /* Bandeau vitesse / batterie / ERS, juste au-dessus du nom du pilote, sur toute la largeur du bandeau.
-   Positionné par rapport à DriverPanelTopBar_content (position: relative). Le moteur d'interface n'étire pas
-   un élément entre left et right : largeur explicite, et largeur fixe pour chaque case. */
+   Positionné par rapport à DriverPanelTopBar_content (position: relative). Le moteur d'interface calcule les
+   pourcentages par rapport au parent (les cases STRAIGHT / OVERTAKE) : largeurs fixes en rem, d'après la largeur
+   du panneau pilote du jeu (DriverPanel_root : 33,33 rem, moins le bouton de repli). */
 .Reg2026Telemetry_root {
   position: absolute;
   left: 0;
   bottom: 100%;
-  width: 100%;
+  width: 31.1111111111rem;
   height: 1.7777777778rem;
   margin-bottom: 0.2222222222rem;
   display: flex;
@@ -62,14 +63,14 @@
   white-space: nowrap;
 }
 .Reg2026Telemetry_cell.speed {
-  width: 28%;
+  width: 7.7777777778rem;
   margin-left: 0.4444444444rem;
 }
 .Reg2026Telemetry_cell.battery {
-  width: 34%;
+  width: 9.4444444444rem;
 }
 .Reg2026Telemetry_cell.ers {
-  width: 34%;
+  width: 11.6666666667rem;
   justify-content: flex-end;
   margin-right: 0.4444444444rem;
 }
