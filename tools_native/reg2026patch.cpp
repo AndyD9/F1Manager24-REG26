@@ -432,10 +432,11 @@ static void UpdateDefence() {
     if (last && Readable(last + CAR_INDEX, 1)) {
         int idx = last[CAR_INDEX];
         BYTE* base = last - (DWORD64)idx * CAR_STRIDE;
-        bool ok = idx < GRID && Readable(base, CAR_STRIDE * GRID);
+        bool ok = idx < GRID;
         for (int i = 0; ok && i < GRID; i++) {
             BYTE* c = base + (DWORD64)i * CAR_STRIDE;
-            if (c[CAR_INDEX] != i) { ok = false; break; }
+            if (!Readable(c, CAR_STRIDE)) { ok = false; break; }
+            if (c[CAR_INDEX] != i) continue;  // emplacements vides en fin de grille (index 0)
             int pos = *(int*)(c + CAR_POS);
             if (c[CAR_MODE] == 2 && pos >= 0 && pos < GRID) byPos[pos] = c;
         }
