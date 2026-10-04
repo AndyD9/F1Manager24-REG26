@@ -138,7 +138,7 @@ local function applyValues()
             local state = done .. "/" .. total
             if valuesState[path] ~= state then
                 valuesState[path] = state
-                log(string.format("valeurs 2026 : %s %d/%d", path:match("[^/]+$"), done, total))
+                log(string.format("valeurs 2026 : %s %d/%d (objet %X)", path:match("[^/]+$"), done, total, obj:GetAddress()))
                 for _, e in ipairs(errors) do log("  impossible : " .. e) end
             end
         elseif valuesState[path] ~= "absent" then

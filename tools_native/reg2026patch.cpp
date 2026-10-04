@@ -124,12 +124,12 @@ struct ErsConfig {
     float harvest;               // +0x2C batterie par appel
     volatile BYTE defend[CARS];  // +0x30 voiture à moins d'1 s derrière (stratégie RÉSERVE)
     float limitLiftCoast;        // +0x50 m/s (stratégie LIFT & COAST)
-    DWORD pad;                   // +0x54
+    float one;                   // +0x54 1.0 : quantité de déploiement pleine
     BYTE* volatile lastCar;      // +0x58 dernier objet voiture vu par la cave (pour trouver le tableau)
 };
-static_assert(offsetof(ErsConfig, defend) == 0x30 && offsetof(ErsConfig, limitLiftCoast) == 0x50 &&
+static_assert(offsetof(ErsConfig, defend) == 0x30 && offsetof(ErsConfig, limitLiftCoast) == 0x50 && offsetof(ErsConfig, one) == 0x54 &&
               offsetof(ErsConfig, lastCar) == 0x58, "décalages lus par les caves");
-static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.0007f, {}, 250.0f / 3.6f, 0, nullptr };
+static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.0007f, {}, 250.0f / 3.6f, 1.0f, nullptr };
 #define g_boost g_cfg.boost
 struct Boost { BYTE* car; float stop; int endLap; };
 static Boost g_boostInfo[CARS];
@@ -272,6 +272,11 @@ static bool BuildCave() {
     BYTE* r6 = jcc(0x77);                   // ja limits (freinage)
     put({ 0xC6, 0x45, 0x38, 0x00 });        // mov byte [rbp+0x38], 0 : pas de recharge
     put({ 0x32, 0xD2 });                    // xor dl, dl : déployer
+    // à pleine puissance : la quantité vient de la décision de l'IA ([rbp+0x48] -> xmm4, puis xmm3 = quantité *
+    // débit de déploiement [r15+0x144]) ; quand l'IA ne voulait pas déployer elle vaut 0, et le déploiement
+    // forcé ne consommait rien et ne donnait rien
+    put({ 0xF3, 0x41, 0x0F, 0x10, 0x9F, 0x44, 0x01, 0x00, 0x00 });  // movss xmm3, [r15+0x144]
+    put({ 0xF3, 0x0F, 0x10, 0x60, 0x54 });  // movss xmm4, [rax+0x54] (1.0)
     land(r3); land(r4); land(r5); land(r6); // limits:
     // vitesse au-delà de laquelle on ne déploie plus : LIFT & COAST toujours, sinon super clipping
     put({ 0x80, 0xBB, 0xF2, 0x0E, 0x00, 0x00, 0x01 });  // cmp byte [rbx+0xEF2], 1
