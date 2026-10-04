@@ -38,26 +38,8 @@ local function fileExists(path)
     return f ~= nil
 end
 
-local function readFile(path)
-    local f = io.open(path, "r")
-    if not f then return nil end
-    local text = f:read("*a")
-    f:close()
-    return text
-end
-
--- test.txt absent : forçage (état Active écrit dans les zones, visuel seulement).
--- test.txt présent : rien n'est forcé au départ ; s'il contient « arme », mode armé (voir updateCar).
-local testCfg = readFile(TEST_FILE)
-local testMode = testCfg ~= nil
-local armMode = testMode and testCfg:find("arme") ~= nil
+local testMode = fileExists(TEST_FILE)
 local forceStraight = not testMode
-local armActive = armMode
-
-local function modeName()
-    if forceStraight then return "force" end
-    return armActive and "arme" or "normal"
-end
 local hud = nil
 local ui = {}            -- éléments du HUD
 local toastUntil = 0
@@ -147,7 +129,7 @@ local function writeMeasure(st, z, data)
     if header then f:write("date;circuit;zone;type;pilote;v_entree;v_max;forcage;drs_avant;drs_dans;overtake;jeu\n") end
     f:write(string.format("%s;%s;%d;%s;%s;%d;%d;%s;%d;%d;%s;%s\n", os.date("%Y-%m-%d %H:%M:%S"), track.name,
         st.zone, z.added and "ajoutee" or "drs", driverCode(data), st.entrySpeed, st.max,
-        st.forced, st.seenBefore, st.seenIn,
+        st.forced and "force" or "normal", st.seenBefore, st.seenIn,
         st.overtake and "overtake" or "-", st.gameOpened and "jeu" or "-"))
     f:close()
 end
@@ -172,7 +154,7 @@ local function updateCar(car)
         -- entrée dans une zone : état du jeu lu avant toute écriture
         st.entry = drs
         st.overtake = (drs == DRS_ENABLED or drs == DRS_ACTIVE)
-        st.max, st.entrySpeed, st.forced, st.gameOpened = speed, speed, modeName(), gameActive
+        st.max, st.entrySpeed, st.forced, st.gameOpened = speed, speed, forceStraight, gameActive
         st.seenBefore, st.seenIn = math.max(st.seen, gameDrs), math.max(gameDrs, 0)
     elseif zone then
         if speed > st.max then st.max = speed end
@@ -200,13 +182,6 @@ local function updateCar(car)
             data.DRSState = zone and st.entry or DRS_DISABLED
         end
         st.wrote = false
-    end
-
-    -- mode armé : hors zone, chaque voiture reçoit le droit au DRS (état Detected, celui que le jeu donne
-    -- à moins d'1 s au point de détection) ; c'est le jeu qui ouvre lui-même au début de la zone suivante,
-    -- avec son vrai gain de vitesse. Un aileron resté ouvert entre deux zones est refermé au passage.
-    if armActive and not zone and (drs == DRS_DISABLED or drs == DRS_ACTIVE) then
-        data.DRSState = DRS_DETECTED
     end
 end
 
@@ -274,18 +249,12 @@ end
 ---------------------------------------------------------------------------
 
 RegisterKeyBind(Key.F7, {}, function()
-    if armMode then
-        armActive = not armActive
-        showToast(armActive and "Straight Mode ARMÉ pour toute la grille (le jeu ouvre)"
-            or "Straight Mode : règle normale du jeu (DRS à 1 s)",
-            armActive and COLOR_ON or COLOR_WARN)
-    else
-        forceStraight = not forceStraight
-        showToast(forceStraight and "Straight Mode FORCÉ pour toute la grille"
-            or "Straight Mode : règle normale du jeu (DRS à 1 s)",
-            forceStraight and COLOR_ON or COLOR_WARN)
-    end
-    log("mode : " .. modeName())
+    forceStraight = not forceStraight
+    log("forçage : " .. (forceStraight and "activé" or "désactivé"))
+    print(string.format("MESURE_F7;%s\n", forceStraight and "force" or "normal"))
+    showToast(forceStraight and "Straight Mode FORCÉ pour toute la grille"
+        or "Straight Mode : règle normale du jeu (DRS à 1 s)",
+        forceStraight and COLOR_ON or COLOR_WARN)
 end)
 
 local hooked = false
@@ -311,7 +280,7 @@ local function tryHook()
             end
         end)
     end)
-    if hooked then log("prêt (F7 forçage)" .. (testMode and (" — MODE TEST : " .. modeName()) or "")) else ExecuteWithDelay(HOOK_RETRY, tryHook) end
+    if hooked then log("prêt (F7 forçage)" .. (testMode and " — MODE TEST : forçage désactivé au départ" or "")) else ExecuteWithDelay(HOOK_RETRY, tryHook) end
 end
 
 tryHook() -- au plus tôt : nos écritures doivent passer avant la lecture du DRS mod
