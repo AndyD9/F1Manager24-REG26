@@ -14,7 +14,7 @@ DST = ROOT / "build" / "json"
 # Asset -> liste de (nom du champ, numéro d'occurrence, valeur d'origine, nouvelle valeur)
 PATCHES = {
     "RaceSimDataAsset": [
-        ("ERSAccelDeployBatteryRate", 0, -0.06, -0.075),
+        ("ERSAccelDeployBatteryRate", 0, -0.06, -0.10),
         ("ERSBrakingChargeBatteryRate", 0, 0.07, 0.12),
         ("ERSAccelerationMultiplier_Inactive", 0, 0.70, 0.66),
         ("ERSWearRate", 0, 13.0, 15.0),

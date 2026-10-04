@@ -37,7 +37,7 @@ Exemple Bahreïn (3 zones) :
 
 | Fichier | Champ | Actuel | Proposé 2026 | Pourquoi |
 |---|---|---|---|---|
-| `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,075** | Déploiement plus puissant ; −0,10 vidait la batterie en quelques secondes |
+| `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,10** | Règlement 2026 : 4 MJ à 350 kW durent 11,4 s, la batterie se vide en ~10 s de déploiement |
 | `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,12** | Récupération environ doublée (8,5 MJ/tour) |
 | `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,66** | Sans ERS, on perd un peu plus de puissance (0,55 et 0,62 écartaient trop le peloton) |
 | `RaceSimDataAsset` | `ERSWearRate` | 13 | 15 | Plus sollicité |
