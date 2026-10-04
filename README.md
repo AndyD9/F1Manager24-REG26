@@ -19,7 +19,14 @@ Straight Mode (aéro active), Overtake Mode et ERS 350 kW.
 - Pour reconstruire les paks de données : [retoc](https://github.com/trumank/retoc), et la clé AES du jeu
   dans la variable `F1M24_AES_KEY` ou dans un fichier `aes_key.txt` à la racine (non versionné).
 
-## Installation
+## Installation rapide
+
+Télécharger la dernière [release](https://github.com/AndyD9/F1Manager24-REG26/releases/latest) :
+
+- `Reg2026_UE4SS.zip` → dézipper dans `F1Manager24/Binaries/Win64/ue4ss/Mods/`
+- `zzz_Reg2026UI_P.pak` → copier dans `F1Manager24/Content/Paks/`
+
+## Installation depuis les sources
 
 1. Copier `ue4ss/Reg2026` dans `F1Manager24/Binaries/Win64/ue4ss/Mods/` (avec `enabled.txt`).
 2. Construire et installer le pak d'interface :
