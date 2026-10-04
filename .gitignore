@@ -13,3 +13,5 @@ __pycache__/
 
 # Ancien HUD, remplacé par ue4ss/Reg2026 + ui_mod
 ue4ss/Reg2026HUD/
+mesures.csv
+test.txt

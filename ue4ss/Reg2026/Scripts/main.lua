@@ -7,8 +7,9 @@
 --    (mesuré à Monza), seulement l'état affiché.
 -- 3. Overtake Mode : disponible si le jeu avait autorisé le DRS (moins d'1 s au point de détection)
 --    au moment d'entrer dans la zone, ou s'il l'ouvre lui-même dans la zone.
--- 4. Mesure : à la sortie de chaque zone, une ligne « MESURE; » dans UE4SS.log (vitesse max, forçage,
---    overtake, et « jeu » si le jeu a ouvert le DRS lui-même dans la zone).
+-- 4. Mesure : à la sortie de chaque zone, une ligne dans Mods/Reg2026/mesures.csv (vitesses d'entrée et max,
+--    forçage, état DRS le plus haut donné par le jeu avant / dans la zone, « jeu » si le jeu a ouvert le DRS).
+--    Mode test : si Mods/Reg2026/test.txt existe, le forçage démarre désactivé (on observe le jeu seul).
 -- 5. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
 --    ici seulement un message temporaire au changement de forçage.
 --
@@ -21,6 +22,9 @@ local HUD_REFRESH = 0.2   -- secondes
 local TRACK_CHECK = 2.0   -- secondes entre deux recherches du circuit chargé
 local TOAST_TIME = 3.0    -- durée du message F7
 local HOOK_RETRY = 250    -- ms : s'enregistrer avant le DRS mod
+local DET_OFFSET = 5      -- nœuds entre le point de détection d'une zone ajoutée et son début
+local TEST_FILE = "ue4ss/Mods/Reg2026/test.txt"
+local CSV_FILE = "ue4ss/Mods/Reg2026/mesures.csv"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3
@@ -29,7 +33,14 @@ local WHITE           = { R = 1, G = 1, B = 1, A = 1 }
 local COLOR_ON        = { R = 0.05, G = 0.55, B = 0.15, A = 0.95 }
 local COLOR_WARN      = { R = 0.60, G = 0.10, B = 0.10, A = 0.95 }
 
-local forceStraight = true
+local function fileExists(path)
+    local f = io.open(path, "r")
+    if f then f:close() end
+    return f ~= nil
+end
+
+local testMode = fileExists(TEST_FILE)
+local forceStraight = not testMode
 local hud = nil
 local ui = {}            -- éléments du HUD
 local toastUntil = 0
@@ -66,10 +77,8 @@ local function zoneAt(node)
     return nil
 end
 
-local function appendPositions(arr, list, field, distField)
-    for _, z in ipairs(list) do
-        arr[#arr + 1] = { m_trackNodeID = z[field], m_splineDistance = z[distField], m_offRaceLineDistance = 0.0 }
-    end
+local function appendPosition(arr, node, dist)
+    arr[#arr + 1] = { m_trackNodeID = node, m_splineDistance = dist, m_offRaceLineDistance = 0.0 }
 end
 
 local function patchTrack()
@@ -92,11 +101,15 @@ local function patchTrack()
     for _, z in ipairs(data.added) do table.insert(track.zones, { s = z.s, e = z.e, added = true }) end
 
     local ok, err = pcall(function()
-        local starts = comp.m_DRSZoneStart
-        local before = #starts
-        appendPositions(starts, data.added, "s", "sd")
-        appendPositions(comp.m_DRSZoneEnd, data.added, "e", "ed")
-        log(string.format("%s : zones %d -> %d (fins %d)", name, before, #comp.m_DRSZoneStart, #comp.m_DRSZoneEnd))
+        -- les trois tableaux vont par index : chaque zone ajoutée a aussi son point de détection
+        local before = #comp.m_DRSZoneStart
+        for _, z in ipairs(data.added) do
+            appendPosition(comp.m_DRSDetection, (z.s - DET_OFFSET) % data.nodes, 0.0)
+            appendPosition(comp.m_DRSZoneStart, z.s, z.sd)
+            appendPosition(comp.m_DRSZoneEnd, z.e, z.ed)
+        end
+        log(string.format("%s : zones %d -> %d (détections %d, fins %d)", name, before, #comp.m_DRSZoneStart,
+            #comp.m_DRSDetection, #comp.m_DRSZoneEnd))
     end)
     if not ok then log("ajout des zones impossible : " .. tostring(err)) end
 end
@@ -105,11 +118,28 @@ end
 -- Voiture par voiture : Straight / Overtake, mesure
 ---------------------------------------------------------------------------
 
+local function driverCode(data)
+    local raw = data.DriverCode:ToString()
+    return raw:match("DriverCode_(%w+)") or raw:match("|(%w+)|") or raw
+end
+
+local function writeMeasure(st, z, data)
+    local header = not fileExists(CSV_FILE)
+    local f = io.open(CSV_FILE, "a")
+    if not f then return end
+    if header then f:write("date;circuit;zone;type;pilote;v_entree;v_max;forcage;drs_avant;drs_dans;overtake;jeu\n") end
+    f:write(string.format("%s;%s;%d;%s;%s;%d;%d;%s;%d;%d;%s;%s\n", os.date("%Y-%m-%d %H:%M:%S"), track.name,
+        st.zone, z.added and "ajoutee" or "drs", driverCode(data), st.entrySpeed, st.max,
+        st.forced and "force" or "normal", st.seenBefore, st.seenIn,
+        st.overtake and "overtake" or "-", st.gameOpened and "jeu" or "-"))
+    f:close()
+end
+
 local function updateCar(car)
     local data = car.CarData
     local key = car:GetAddress()
     local st = cars[key]
-    if not st then st = { zone = nil, overtake = false, wrote = false }; cars[key] = st end
+    if not st then st = { zone = nil, overtake = false, wrote = false, seen = 0 }; cars[key] = st end
 
     local drs = tonumber(data.DRSState)
     local zone = zoneAt(tonumber(data.CurrentTrackNode))
@@ -118,22 +148,26 @@ local function updateCar(car)
     -- un Active que nous n'avons pas écrit vient du jeu (DRS réel)
     local gameActive = drs == DRS_ACTIVE and not st.wrote
 
+    -- état DRS donné par le jeu (nos propres écritures exclues)
+    local gameDrs = (st.wrote and drs == DRS_ACTIVE) and -1 or drs
+
     if zone and zone ~= st.zone then
         -- entrée dans une zone : état du jeu lu avant toute écriture
         st.entry = drs
         st.overtake = (drs == DRS_ENABLED or drs == DRS_ACTIVE)
-        st.max, st.forced, st.gameOpened = speed, forceStraight, gameActive
+        st.max, st.entrySpeed, st.forced, st.gameOpened = speed, speed, forceStraight, gameActive
+        st.seenBefore, st.seenIn = math.max(st.seen, gameDrs), math.max(gameDrs, 0)
     elseif zone then
         if speed > st.max then st.max = speed end
         if gameActive then st.gameOpened, st.overtake = true, true end
+        if gameDrs > st.seenIn then st.seenIn = gameDrs end
     else
         if st.zone and track then
-            local z = track.zones[st.zone]
-            print(string.format("MESURE;%s;%d;%s;%s;%d;%s;%s;%s\n", track.name, st.zone,
-                z.added and "ajoutee" or "drs", data.DriverCode:ToString(), st.max,
-                st.forced and "force" or "normal", st.overtake and "overtake" or "-",
-                st.gameOpened and "jeu" or "-"))
+            local ok, err = pcall(writeMeasure, st, track.zones[st.zone], data)
+            if not ok then logOnce("mesure impossible : " .. tostring(err)) end
+            st.seen = 0
         end
+        if gameDrs > st.seen then st.seen = gameDrs end
         st.overtake = (drs == DRS_DETECTED or drs == DRS_ENABLED)
     end
     st.zone = zone
@@ -247,7 +281,7 @@ local function tryHook()
             end
         end)
     end)
-    if hooked then log("prêt (F7 forçage)") else ExecuteWithDelay(HOOK_RETRY, tryHook) end
+    if hooked then log("prêt (F7 forçage)" .. (testMode and " — MODE TEST : forçage désactivé au départ" or "")) else ExecuteWithDelay(HOOK_RETRY, tryHook) end
 end
 
 tryHook() -- au plus tôt : nos écritures doivent passer avant la lecture du DRS mod
