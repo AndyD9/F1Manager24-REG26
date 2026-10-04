@@ -9,11 +9,14 @@ define(["require", "exports", "common/components/DataStoreComponent", "common/co
     //              la ligne, la case reste allumée pendant le tour qui commence. L'écart est lu dans le
     //              classement (timeDeltaFromLead), un peu après le changement de tour pour qu'il soit à jour.
     //              Le saut de batterie ne suffit pas : la recharge au freinage fait des sauts aussi grands.
+    //   Bandeau Reg2026Telemetry, au-dessus du nom du pilote : vitesse, batterie, état ERS (déploie / recharge /
+    //   neutre) et énergie déployée dans le tour (ersDeploy, sur 4 MJ comme l'écran Stratégies ERS).
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.DRSDisplay = void 0;
     (0, CSSUtil_1.loadCSS)('project/components/raceWeekend/DRSDisplay');
     (0, CSSUtil_1.loadCSS)('project/components/raceWeekend/Reg2026Modes');
     const EDRSState = GameTypes_1.EDRSState;
+    const EERSState = GameTypes_1.EERSState;
     const STANDINGS = ['RaceSim', 'RaceStandings'];
     const OVERTAKE_GAP = 1.0;
     const CHECK_DELAY_MS = 1500;
@@ -46,8 +49,26 @@ define(["require", "exports", "common/components/DataStoreComponent", "common/co
         }
         return undefined;
     }
+    /// bandeau au-dessus du nom du pilote : vitesse, batterie, état ERS et énergie déployée dans le tour
+    function Telemetry(props) {
+        const battery = Math.max(0, Math.min(100, Math.round(props.battery || 0)));
+        const ers = props.ersState == EERSState.Deploy ? 'deploy' : props.ersState == EERSState.Charge ? 'charge' : 'idle';
+        const ersLabel = ers == 'deploy' ? 'DÉPLOIE' : ers == 'charge' ? 'RECHARGE' : 'NEUTRE';
+        const deployed = (props.ersDeploy || 0).toFixed(1).replace('.', ',');
+        return preact.h("div", { className: 'Reg2026Telemetry_root' },
+            preact.h("div", { className: 'Reg2026Telemetry_cell speed' },
+                preact.h("span", { className: 'Reg2026Telemetry_value' }, Math.round(props.speed || 0)),
+                preact.h("span", { className: 'Reg2026Telemetry_unit' }, 'KM/H')),
+            preact.h("div", { className: 'Reg2026Telemetry_cell battery' },
+                preact.h("div", { className: 'Reg2026Telemetry_bar' },
+                    preact.h("div", { className: (0, classnames_1.classNames)('Reg2026Telemetry_barFill', { low: battery < 25 }), style: { width: battery + '%' } })),
+                preact.h("span", { className: 'Reg2026Telemetry_value' }, battery + ' %')),
+            preact.h("div", { className: (0, classnames_1.classNames)('Reg2026Telemetry_cell ers', ers) },
+                preact.h("span", { className: (0, classnames_1.classNames)('Reg2026Telemetry_state', ers) }, ersLabel),
+                preact.h("span", { className: 'Reg2026Telemetry_unit' }, deployed + ' / 4,0 MJ')));
+    }
     class _DRSDisplay extends preact.Component {
-        state = { straight: false, overtake: false };
+        state = { straight: false, overtake: false, speed: 0, battery: 0, ersState: 0, ersDeploy: 0 };
         _context = undefined;
         _lap = undefined;
         _timer = undefined;
@@ -56,6 +77,10 @@ define(["require", "exports", "common/components/DataStoreComponent", "common/co
             this._lap = undefined;
             dataHelper.addPropertyListener(context, 'DRSState', this.onDRSStateChanged);
             dataHelper.addPropertyListener(context, 'lapCount', this.onLapChanged);
+            dataHelper.addPropertyListener(context, 'speed', (v) => this.setState({ speed: Number(v) }));
+            dataHelper.addPropertyListener(context, 'batteryPercentage', (v) => this.setState({ battery: Number(v) }));
+            dataHelper.addPropertyListener(context, 'ersState', (v) => this.setState({ ersState: Number(v) }));
+            dataHelper.addPropertyListener(context, 'ersDeploy', (v) => this.setState({ ersDeploy: Number(v) }));
             dataHelper.getAllPropertiesNow();
         }
         componentWillUnmount() {
@@ -64,6 +89,7 @@ define(["require", "exports", "common/components/DataStoreComponent", "common/co
         render(props, state) {
             return (!props.disabled &&
                 preact.h("div", { className: 'Reg2026Modes_root' },
+                    preact.h(Telemetry, { speed: state.speed, battery: state.battery, ersState: state.ersState, ersDeploy: state.ersDeploy }),
                     preact.h(ModeBox, { mode: 'straight', label: 'STRAIGHT', active: state.straight, focused: props.focused }),
                     preact.h(ModeBox, { mode: 'overtake', label: 'OVERTAKE', active: state.overtake, focused: props.focused })));
         }
