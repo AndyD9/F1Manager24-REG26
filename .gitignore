@@ -21,3 +21,6 @@ tools_native/build/
 tools_native/test/*.exe
 tools_native/test/*.obj
 tools_native/test/dummy_addr.txt
+
+# DLL compilée par tools_native/build.bat (fournie dans la release)
+ue4ss/Reg2026/Reg2026Patch.dll

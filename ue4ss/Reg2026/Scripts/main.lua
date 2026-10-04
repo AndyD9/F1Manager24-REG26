@@ -1,19 +1,18 @@
 -- Reg2026 : Straight Mode pour toute la grille.
 --
--- 1. Zones : au chargement d'un circuit, ajoute les zones Straight Mode (zones.lua) aux zones DRS du jeu.
--- 2. Straight Mode : dans une zone, l'état DRS de chaque voiture est forcé à Active (si le forçage est actif).
---    L'animation des ailerons reste celle du « DRS mod », qui lit cet état : notre hook est enregistré
---    au plus tôt pour écrire avant sa lecture. Le forçage ne change pas la vitesse calculée par le jeu
---    (mesuré à Monza), seulement l'état affiché.
--- 3. Overtake Mode : disponible si le jeu avait autorisé le DRS (moins d'1 s au point de détection)
---    au moment d'entrer dans la zone, ou s'il l'ouvre lui-même dans la zone.
--- 4. Mesure : à la sortie de chaque zone, une ligne dans Mods/Reg2026/mesures.csv (vitesses d'entrée et max,
---    forçage, état DRS le plus haut donné par le jeu avant / dans la zone, « jeu » si le jeu a ouvert le DRS).
---    Mode test : si Mods/Reg2026/test.txt existe, le forçage démarre désactivé (on observe le jeu seul).
--- 5. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
---    ici seulement un message temporaire au changement de forçage.
+-- 1. Zones : au chargement d'un circuit, ajoute les zones Straight Mode (zones.lua) aux zones DRS du jeu
+--    (début et fin seulement : un point de détection ajouté provoque un drapeau rouge). Le jeu enchaîne
+--    sur une zone ajoutée quand aucun point de détection ne la précède.
+-- 2. Straight Mode réel : Reg2026Patch.dll (tools_native/reg2026patch.cpp) retire du jeu la règle
+--    « moins d'1 s » au point de détection. Toute la grille a alors le DRS dans les zones, ouvert par le jeu
+--    lui-même avec son vrai gain de vitesse ; les blocages du jeu restent (premiers tours, voiture de
+--    sécurité, drapeaux, pluie). Le DRS mod et le bandeau des pilotes suivent l'état du jeu.
+-- 3. Mesure : à la sortie de chaque zone, une ligne dans Mods/Reg2026/mesures.csv (vitesses d'entrée et max,
+--    Straight Mode actif ou non, état DRS le plus haut avant / dans la zone, « jeu » si le DRS a été ouvert).
+-- 4. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
+--    ici seulement un message temporaire au changement de mode.
 --
--- Touche : F7 activer/désactiver le forçage.
+-- Touche : F7 Straight Mode pour toute la grille / règle d'origine du jeu (DRS à moins d'1 s).
 local UEHelpers = require("UEHelpers")
 local ZONES = require("zones")
 
@@ -22,8 +21,9 @@ local HUD_REFRESH = 0.2   -- secondes
 local TRACK_CHECK = 2.0   -- secondes entre deux recherches du circuit chargé
 local TOAST_TIME = 3.0    -- durée du message F7
 local HOOK_RETRY = 250    -- ms : s'enregistrer avant le DRS mod
-local TEST_FILE = "ue4ss/Mods/Reg2026/test.txt"
-local CSV_FILE = "ue4ss/Mods/Reg2026/mesures.csv"
+local MOD_DIR = "ue4ss/Mods/Reg2026/"
+local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
+local CSV_FILE = MOD_DIR .. "mesures.csv"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3
@@ -38,8 +38,7 @@ local function fileExists(path)
     return f ~= nil
 end
 
-local testMode = fileExists(TEST_FILE)
-local forceStraight = not testMode
+local straightOn = not fileExists(OFF_FILE)
 local hud = nil
 local ui = {}            -- éléments du HUD
 local toastUntil = 0
@@ -129,7 +128,7 @@ local function writeMeasure(st, z, data)
     if header then f:write("date;circuit;zone;type;pilote;v_entree;v_max;forcage;drs_avant;drs_dans;overtake;jeu\n") end
     f:write(string.format("%s;%s;%d;%s;%s;%d;%d;%s;%d;%d;%s;%s\n", os.date("%Y-%m-%d %H:%M:%S"), track.name,
         st.zone, z.added and "ajoutee" or "drs", driverCode(data), st.entrySpeed, st.max,
-        st.forced and "force" or "normal", st.seenBefore, st.seenIn,
+        st.mode, st.seenBefore, st.seenIn,
         st.overtake and "overtake" or "-", st.gameOpened and "jeu" or "-"))
     f:close()
 end
@@ -138,23 +137,21 @@ local function updateCar(car)
     local data = car.CarData
     local key = car:GetAddress()
     local st = cars[key]
-    if not st then st = { zone = nil, overtake = false, wrote = false, seen = 0 }; cars[key] = st end
+    if not st then st = { zone = nil, overtake = false, seen = 0 }; cars[key] = st end
 
     local drs = tonumber(data.DRSState)
     local zone = zoneAt(tonumber(data.CurrentTrackNode))
     local speed = tonumber(data.SpeedKPH) or 0
 
-    -- un Active que nous n'avons pas écrit vient du jeu (DRS réel)
-    local gameActive = drs == DRS_ACTIVE and not st.wrote
-
-    -- état DRS donné par le jeu (nos propres écritures exclues)
-    local gameDrs = (st.wrote and drs == DRS_ACTIVE) and -1 or drs
+    local gameActive = drs == DRS_ACTIVE
+    local gameDrs = drs
 
     if zone and zone ~= st.zone then
         -- entrée dans une zone : état du jeu lu avant toute écriture
         st.entry = drs
         st.overtake = (drs == DRS_ENABLED or drs == DRS_ACTIVE)
-        st.max, st.entrySpeed, st.forced, st.gameOpened = speed, speed, forceStraight, gameActive
+        st.max, st.entrySpeed, st.gameOpened = speed, speed, gameActive
+        st.mode = straightOn and "straight" or "normal"
         st.seenBefore, st.seenIn = math.max(st.seen, gameDrs), math.max(gameDrs, 0)
     elseif zone then
         if speed > st.max then st.max = speed end
@@ -170,19 +167,6 @@ local function updateCar(car)
         st.overtake = (drs == DRS_DETECTED or drs == DRS_ENABLED)
     end
     st.zone = zone
-
-    if forceStraight and zone then
-        if drs ~= DRS_ACTIVE then
-            data.DRSState = DRS_ACTIVE
-            st.wrote = true
-        end
-    elseif st.wrote then
-        -- forçage coupé (F7) ou sortie de zone : on rend l'état d'origine si c'est encore le nôtre
-        if drs == DRS_ACTIVE then
-            data.DRSState = zone and st.entry or DRS_DISABLED
-        end
-        st.wrote = false
-    end
 end
 
 ---------------------------------------------------------------------------
@@ -249,7 +233,7 @@ end
 ---------------------------------------------------------------------------
 
 -- F11 (recherche) : adresse de chaque voiture et quelques valeurs de CarData, pour retrouver la position
--- de CarData en mémoire (tools_native/find_cardata.py). Pas de réflexion UE4SS : seulement des lectures simples.
+-- de CarData en mémoire (tools_native/inject.py find). Pas de réflexion UE4SS : seulement des lectures simples.
 local DEBUG_FILE = "ue4ss/Mods/Reg2026/debug_cars.txt"
 
 local function dumpCars()
@@ -274,13 +258,32 @@ RegisterKeyBind(Key.F11, {}, function()
 end)
 
 RegisterKeyBind(Key.F7, {}, function()
-    forceStraight = not forceStraight
-    log("forçage : " .. (forceStraight and "activé" or "désactivé"))
-    print(string.format("MESURE_F7;%s\n", forceStraight and "force" or "normal"))
-    showToast(forceStraight and "Straight Mode FORCÉ pour toute la grille"
-        or "Straight Mode : règle normale du jeu (DRS à 1 s)",
-        forceStraight and COLOR_ON or COLOR_WARN)
+    straightOn = not straightOn
+    if straightOn then
+        os.remove(OFF_FILE)
+    else
+        local f = io.open(OFF_FILE, "w")
+        if f then f:write("Straight Mode coupé (F7)"); f:close() end
+    end
+    log("Straight Mode : " .. (straightOn and "toute la grille" or "règle d'origine"))
+    showToast(straightOn and "Straight Mode : DRS pour toute la grille"
+        or "Règle d'origine du jeu : DRS à moins d'1 s",
+        straightOn and COLOR_ON or COLOR_WARN)
 end)
+
+--- charge Reg2026Patch.dll (le travail se fait depuis son DllMain)
+local function loadPatch()
+    local dir = debug.getinfo(1, "S").source:match("^@(.*[/\\])Scripts[/\\]")
+    for _, path in ipairs({ dir and (dir .. "Reg2026Patch.dll"), MOD_DIR .. "Reg2026Patch.dll" }) do
+        if path and fileExists(path) then
+            local ok, err = package.loadlib(path, "*")
+            if ok then log("Reg2026Patch.dll chargée (journal : patch.log)") return end
+            log("Reg2026Patch.dll impossible à charger : " .. tostring(err))
+            return
+        end
+    end
+    log("Reg2026Patch.dll introuvable : Straight Mode seulement visuel")
+end
 
 local hooked = false
 local function tryHook()
@@ -305,7 +308,8 @@ local function tryHook()
             end
         end)
     end)
-    if hooked then log("prêt (F7 forçage)" .. (testMode and " — MODE TEST : forçage désactivé au départ" or "")) else ExecuteWithDelay(HOOK_RETRY, tryHook) end
+    if hooked then log("prêt (F7 Straight Mode)") else ExecuteWithDelay(HOOK_RETRY, tryHook) end
 end
 
-tryHook() -- au plus tôt : nos écritures doivent passer avant la lecture du DRS mod
+loadPatch()
+tryHook()
