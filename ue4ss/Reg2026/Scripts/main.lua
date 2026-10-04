@@ -22,7 +22,6 @@ local HUD_REFRESH = 0.2   -- secondes
 local TRACK_CHECK = 2.0   -- secondes entre deux recherches du circuit chargé
 local TOAST_TIME = 3.0    -- durée du message F7
 local HOOK_RETRY = 250    -- ms : s'enregistrer avant le DRS mod
-local DET_OFFSET = 5      -- nœuds entre le point de détection d'une zone ajoutée et son début
 local TEST_FILE = "ue4ss/Mods/Reg2026/test.txt"
 local CSV_FILE = "ue4ss/Mods/Reg2026/mesures.csv"
 
@@ -101,10 +100,10 @@ local function patchTrack()
     for _, z in ipairs(data.added) do table.insert(track.zones, { s = z.s, e = z.e, added = true }) end
 
     local ok, err = pcall(function()
-        -- les trois tableaux vont par index : chaque zone ajoutée a aussi son point de détection
+        -- Pas de point de détection pour les zones ajoutées : en ajouter un (2026-10-04, Monza) a provoqué
+        -- un drapeau rouge dès que le jeu a activé le DRS. On n'ajoute que le début et la fin.
         local before = #comp.m_DRSZoneStart
         for _, z in ipairs(data.added) do
-            appendPosition(comp.m_DRSDetection, (z.s - DET_OFFSET) % data.nodes, 0.0)
             appendPosition(comp.m_DRSZoneStart, z.s, z.sd)
             appendPosition(comp.m_DRSZoneEnd, z.e, z.ed)
         end
