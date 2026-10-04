@@ -44,7 +44,7 @@ Sources : [Motor Sport Magazine](https://www.motorsportmagazine.com/articles/sin
 | Gain du Straight Mode (avant + arrière, traînée −55 %) | Pak : courbe DRS d'origine, `DRSTopSpeedMultiplier` 1,03–1,06 (1,016–1,043), `DRSAccelerationMultiplier` 1,05–1,20 (1,0–1,146) | 🧪 à valider par des temps au tour |
 | **Overtake Mode** (< 1 s → +0,5 MJ) | `Reg2026Patch.dll` : à moins d'1 s, +12,5 % de batterie (objet voiture +0x878), une fois par tour | ✅ vu en course (patch.log) |
 | Case OVERTAKE du bandeau | Interface : écart avec la voiture devant lu dans le classement au passage de la ligne ; à moins d'1 s, allumée pendant le tour (la recharge au freinage fait des sauts de batterie aussi grands que le bonus, on ne peut pas s'y fier) | 🧪 à voir en course |
-| 350 kW, 50 % électrique | Pak : `ERSAccelDeployBatteryRate` −0,10, `ERSAccelerationMultiplier_Inactive` 0,55 | ✅ cohérent : batterie vide en ~10 s, 4 MJ à 350 kW durent 11,4 s |
+| 350 kW, 50 % électrique | Pak : `ERSAccelDeployBatteryRate` −0,075, `ERSAccelerationMultiplier_Inactive` 0,62 | 🧪 −0,10 / 0,55 vidaient la batterie trop vite en course ; valeurs adoucies |
 | 8,5 MJ récupérés par tour | Pak : `ERSBrakingChargeBatteryRate` 0,12 | ✅ ordre de grandeur correct (~2 batteries par tour) |
 | Puissance électrique réduite au-delà de 290 km/h | Pas d'équivalent dans le jeu (multiplicateur d'accélération) | ➖ non reproduit |
 | Appui −30 % (−30 kg) | Pak : `AeroSpeedMultipliers` virages lents −2 %, moyens −5 %, rapides −8 % | 🧪 à valider par des temps au tour |
@@ -54,4 +54,5 @@ Sources : [Motor Sport Magazine](https://www.motorsportmagazine.com/articles/sin
 ## 4. Reste à faire
 
 - Valider l'aéro par des temps au tour (pak actuel contre `build/backup_pak_v1`) et ajuster.
+- Dépassements : avec le Straight Mode pour tous, l'écart de vitesse vient de l'aspiration (1,10) et de la difficulté de dépassement (0,30). Overtake Mode ne donne que de la batterie ; le rendre plus fort (déploiement forcé au tour suivant) demande de retrouver le mode ERS dans l'objet voiture.
 - Monaco sans zone : retirer la zone du jeu demande de toucher aux points de détection (risque de drapeau rouge).

@@ -26,7 +26,7 @@ Exemple Bahreïn (3 zones) :
 | Fichier | Champ | Actuel | Proposé 2026 | Pourquoi |
 |---|---|---|---|---|
 | `RaceSim/DRSAccelerationSpeedCurce` | courbe : 0 km/h → 0 ; 360 km/h → **1,0** | 1,0 | **0,75** | Tout le monde l'a, donc gain plus petit pour ne pas casser les chronos |
-| `RaceSimDataAsset` | `SlipstreamAccelerationMultiplier` | 1,08 | 1,06 | Moins d'aspiration avec moins de traînée |
+| `RaceSimDataAsset` | `SlipstreamAccelerationMultiplier` | 1,08 | 1,10 | Aspiration plus forte : avec le Straight Mode pour tous, c'est elle qui crée l'écart de vitesse pour dépasser |
 | `RaceSimDataAsset` | `DirtyAirMaxDist` | 220 | **150** | Voitures 2026 : moins d'air sale, on peut suivre de plus près |
 
 ### Écart de 1 seconde
@@ -37,19 +37,19 @@ Exemple Bahreïn (3 zones) :
 
 | Fichier | Champ | Actuel | Proposé 2026 | Pourquoi |
 |---|---|---|---|---|
-| `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,10** | Déploiement beaucoup plus puissant, la batterie se vide plus vite |
+| `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,075** | Déploiement plus puissant ; −0,10 vidait la batterie en quelques secondes |
 | `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,12** | Récupération environ doublée (8,5 MJ/tour) |
-| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,55** | Sans ERS, on perd la moitié de la puissance en 2026 |
+| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,62** | Sans ERS, on perd plus de puissance en 2026 (0,55 était trop punitif) |
 | `RaceSimDataAsset` | `ERSWearRate` | 13 | 15 | Plus sollicité |
-| `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | 0,55 | Les pilotes utilisent plus l'électrique |
+| `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | 0,50 | Les pilotes utilisent plus l'électrique |
 | `AI/RaceSimAIDataAsset` | `ERSChargingModeToggleThreshold` | 0,5 / 0,25 | 0,6 / 0,35 | L'IA recharge plus tôt (gestion d'énergie clé en 2026) |
 
 ## 3. Overtake Mode
 
 | Fichier | Champ | Actuel | Proposé 2026 |
 |---|---|---|---|
-| `RaceSimDataAsset` › OvertakeData | `OvertakeAssistOvertakeDifficultyModifier` | 0,125 | **0,20** |
-| `RaceSimDataAsset` › OvertakeData | `SlipstreamTimeToOvertake` | 2,5 | 2,0 |
+| `RaceSimDataAsset` › OvertakeData | `OvertakeAssistOvertakeDifficultyModifier` | 0,125 | **0,30** |
+| `RaceSimDataAsset` › OvertakeData | `SlipstreamTimeToOvertake` | 2,5 | 1,5 |
 | `RaceSimDataAsset` › OvertakeData | `OvertakeMaxStartDistance` | 40 | 50 |
 | `DriverTacticsDataAsset` | `OvertakeStrategyStatMultiplier` (agressif) | 1,2 | 1,3 |
 | `OvertakeProbabilityAtSkillDifference` | courbe −40 → 0,10 ; +40 → 0,90 | | inchangée |

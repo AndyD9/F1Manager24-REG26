@@ -14,18 +14,18 @@ DST = ROOT / "build" / "json"
 # Asset -> liste de (nom du champ, numéro d'occurrence, valeur d'origine, nouvelle valeur)
 PATCHES = {
     "RaceSimDataAsset": [
-        ("ERSAccelDeployBatteryRate", 0, -0.06, -0.10),
+        ("ERSAccelDeployBatteryRate", 0, -0.06, -0.075),
         ("ERSBrakingChargeBatteryRate", 0, 0.07, 0.12),
-        ("ERSAccelerationMultiplier_Inactive", 0, 0.70, 0.55),
+        ("ERSAccelerationMultiplier_Inactive", 0, 0.70, 0.62),
         ("ERSWearRate", 0, 13.0, 15.0),
-        ("SlipstreamAccelerationMultiplier", 0, 1.08, 1.06),
+        ("SlipstreamAccelerationMultiplier", 0, 1.08, 1.10),
         ("DirtyAirMaxDist", 0, 220.0, 150.0),
-        ("OvertakeAssistOvertakeDifficultyModifier", 0, 0.125, 0.20),
-        ("SlipstreamTimeToOvertake", 0, 2.5, 2.0),
+        ("OvertakeAssistOvertakeDifficultyModifier", 0, 0.125, 0.30),
+        ("SlipstreamTimeToOvertake", 0, 2.5, 1.5),
         ("OvertakeMaxStartDistance", 0, 40.0, 50.0),
     ],
     "DriverTacticsDataAsset": [
-        ("ERSDeployBudget", 0, 0.45, 0.55),
+        ("ERSDeployBudget", 0, 0.45, 0.50),
         ("OvertakeStrategyStatMultiplier", 0, 1.2, 1.3),
     ],
     "RaceSimAIDataAsset": [
