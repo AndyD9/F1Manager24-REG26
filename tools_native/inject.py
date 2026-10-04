@@ -104,9 +104,55 @@ def show():
                     break
 
 
+DEBUG_CARS = Path(r"F:\SteamLibrary\steamapps\common\F1 Manager 2024\F1Manager24\Binaries\Win64\ue4ss\Mods\Reg2026\debug_cars.txt")
+ACTOR_SCAN = 0x4000
+
+
+def read_mem(h, addr, size):
+    buf = ctypes.create_string_buffer(size)
+    got = ctypes.c_size_t()
+    k32.ReadProcessMemory.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+                                      ctypes.POINTER(ctypes.c_size_t)]
+    if not k32.ReadProcessMemory(h, ctypes.c_void_p(addr), buf, size, ctypes.byref(got)):
+        return None
+    return buf.raw[:got.value]
+
+
+def find():
+    """Retrouve DRSState dans CarData à partir de debug_cars.txt (touche F11) et écrit la cible."""
+    import struct
+    rows = [l.split(";") for l in DEBUG_CARS.read_text(encoding="utf-8").splitlines()[1:] if l.strip()]
+    h = k32.OpenProcess(0x0410, False, find_pid())  # VM_READ | QUERY_INFORMATION
+    common = None
+    cars = []
+    for r in rows:
+        code, addr = r[0], int(r[1], 16)
+        num, pos, lap = int(r[2]), int(r[3]), int(r[4])
+        mem = read_mem(h, addr, ACTOR_SCAN)
+        if not mem:
+            print(f"{code} : lecture impossible")
+            continue
+        # RacePos puis LapCount, deux int32 consécutifs (ordre de FCarData)
+        offs = {o for o in range(0, len(mem) - 8, 4) if struct.unpack_from("<ii", mem, o) == (pos, lap)}
+        common = offs if common is None else common & offs
+        cars.append((code, addr, mem, num))
+    if not common:
+        sys.exit("décalage introuvable (relancer F11 puis find juste après)")
+    for o in sorted(common):
+        drs = o - 4 - 3  # Gear (int32) juste avant RacePos, DRSState 3 octets avant Gear
+        vals = [c[2][drs] for c in cars]
+        print(f"RacePos à +0x{o:X} -> DRSState probable à +0x{drs:X}, valeurs : {vals}")
+    o = sorted(common)[0]
+    target = cars[0][1] + o - 7
+    TARGET.write_text(f"{target:X}")
+    print(f"cible = {cars[0][0]} +0x{o - 7:X} = {target:X}")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1]
-    if cmd == "target":
+    if cmd == "find":
+        find()
+    elif cmd == "target":
         TARGET.write_text(sys.argv[2])
         print(f"cible {sys.argv[2]}")
     elif cmd == "inject":

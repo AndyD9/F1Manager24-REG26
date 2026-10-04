@@ -248,47 +248,28 @@ end
 -- Touches et boucle
 ---------------------------------------------------------------------------
 
--- F8 (recherche) : adresses mémoire de CarData pour l'outil de point d'arrêt (tools_native/)
+-- F11 (recherche) : adresse de chaque voiture et quelques valeurs de CarData, pour retrouver la position
+-- de CarData en mémoire (tools_native/find_cardata.py). Pas de réflexion UE4SS : seulement des lectures simples.
 local DEBUG_FILE = "ue4ss/Mods/Reg2026/debug_cars.txt"
-
---- décalage d'une propriété dans une classe/struct (en remontant les parents)
-local function propertyOffset(struct, name)
-    while struct and struct:IsValid() do
-        local found
-        struct:ForEachProperty(function(prop)
-            if prop:GetFName():ToString() == name then found = prop; return true end
-        end)
-        if found then return found:GetOffset_Internal(), found end
-        struct = struct:GetSuperStruct()
-    end
-    return nil
-end
 
 local function dumpCars()
     local list = FindAllOf("CarActor") or {}
-    if #list == 0 then log("F8 : aucune voiture"); return end
-    local dataOff, dataProp = propertyOffset(list[1]:GetClass(), "CarData")
-    local inner = dataProp:GetStruct()
-    local offs = {}
-    for _, n in ipairs({ "DRSState", "SpeedKPH", "CurrentTrackNode", "DriverNumber" }) do
-        offs[n] = propertyOffset(inner, n)
-    end
     local f = io.open(DEBUG_FILE, "w")
-    f:write("# pilote;adresse_voiture;off_CarData;off_DRSState;off_SpeedKPH;off_CurrentTrackNode;off_DriverNumber;DRSState;vitesse\n")
+    f:write("pilote;adresse;DriverNumber;RacePos;LapCount;Gear;CurrentTrackNode;DRSState;SpeedKPH\n")
     for _, car in ipairs(list) do
         local data = car.CarData
-        f:write(string.format("%s;%X;%d;%d;%d;%d;%d;%d;%d\n", driverCode(data), car:GetAddress(), dataOff,
-            offs.DRSState, offs.SpeedKPH, offs.CurrentTrackNode, offs.DriverNumber,
-            tonumber(data.DRSState), tonumber(data.SpeedKPH)))
+        f:write(string.format("%s;%X;%d;%d;%d;%d;%d;%d;%d\n", driverCode(data), car:GetAddress(),
+            tonumber(data.DriverNumber), tonumber(data.RacePos), tonumber(data.LapCount), tonumber(data.Gear),
+            tonumber(data.CurrentTrackNode), tonumber(data.DRSState), tonumber(data.SpeedKPH)))
     end
     f:close()
-    log(string.format("F8 : %d voitures écrites dans debug_cars.txt (CarData +%d, DRSState +%d)", #list, dataOff, offs.DRSState))
+    log(string.format("F11 : %d voitures écrites dans debug_cars.txt", #list))
 end
 
-RegisterKeyBind(Key.F8, {}, function()
+RegisterKeyBind(Key.F11, {}, function()
     ExecuteInGameThread(function()
         local ok, err = pcall(dumpCars)
-        if not ok then log("F8 impossible : " .. tostring(err)) end
+        if not ok then log("F11 impossible : " .. tostring(err)) end
     end)
 end)
 
