@@ -39,16 +39,16 @@ Exemple Bahreïn (3 zones) :
 |---|---|---|---|---|
 | `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,075** | Déploiement plus puissant ; −0,10 vidait la batterie en quelques secondes |
 | `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,12** | Récupération environ doublée (8,5 MJ/tour) |
-| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,62** | Sans ERS, on perd plus de puissance en 2026 (0,55 était trop punitif) |
+| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,66** | Sans ERS, on perd un peu plus de puissance (0,55 et 0,62 écartaient trop le peloton) |
 | `RaceSimDataAsset` | `ERSWearRate` | 13 | 15 | Plus sollicité |
 | `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | 0,50 | Les pilotes utilisent plus l'électrique |
-| `AI/RaceSimAIDataAsset` | `ERSChargingModeToggleThreshold` | 0,5 / 0,25 | 0,6 / 0,35 | L'IA recharge plus tôt (gestion d'énergie clé en 2026) |
+| `AI/RaceSimAIDataAsset` | `ERSChargingModeToggleThreshold` | 0,5 / 0,25 | 0,5 / 0,25 (inchangé) | 0,6 / 0,35 laissait l'IA en recharge trop longtemps, donc lente |
 
 ## 3. Overtake Mode
 
 | Fichier | Champ | Actuel | Proposé 2026 |
 |---|---|---|---|
-| `RaceSimDataAsset` › OvertakeData | `OvertakeAssistOvertakeDifficultyModifier` | 0,125 | **0,30** |
+| `RaceSimDataAsset` › OvertakeData | `OvertakeAssistOvertakeDifficultyModifier` | 0,125 | **0,25** |
 | `RaceSimDataAsset` › OvertakeData | `SlipstreamTimeToOvertake` | 2,5 | 1,5 |
 | `RaceSimDataAsset` › OvertakeData | `OvertakeMaxStartDistance` | 40 | 50 |
 | `DriverTacticsDataAsset` | `OvertakeStrategyStatMultiplier` (agressif) | 1,2 | 1,3 |
