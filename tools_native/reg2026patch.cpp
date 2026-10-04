@@ -23,6 +23,17 @@
 //    où le jeu donne le droit au DRS. Le thread de la DLL vide la file et ajoute OVERTAKE_ENERGY à la
 //    batterie (float 0..1 en +0x878), une fois par tour et par voiture : 0,5 MJ sur 4 MJ = 12,5 %.
 //
+// 3. Overtake Mode utilisé : la voiture qui a reçu le bonus déploie l'ERS à fond tant qu'elle n'a pas dépensé
+//    ces 12,5 % (au plus jusqu'à la fin du tour suivant). Mise à jour ERS du jeu, exe+0x2308250 : la décision
+//    de l'IA (230B990) donne [rbp+0x38] = 0 (pas de recharge) / 1 / 2, puis dl = 0 veut dire « déployer » :
+//        23084B8  xor dl, dl / jmp / mov dl, 1
+//        23084BE  movzx eax, byte ptr [rbp + 0x38]          ; 0F B6 45 38
+//        23084C2  movss xmm5, dword ptr [rip + 0x3CA6FCA]    ; F3 0F 10 2D CA 6F CA 03
+//    Ces 12 octets deviennent « mov rax, cave ; jmp rax » (rax est écrasé juste après). Quand l'IA ne recharge
+//    pas et que la voiture (index en +0x710) a le bonus, la cave met dl = 0. Le code en 230848F, juste avant,
+//    est un saut de Denuvo : on n'y touche pas. Ce crochet est posé une fois au chargement (avant toute
+//    course) et reste en place ; F7 vide seulement la liste des voitures en Overtake.
+//
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
 #include <stdio.h>
@@ -40,7 +51,15 @@ static const BYTE GAP_ORIGINAL[12] = { 0x0F, 0x28, 0xC6, 0xF3, 0x0F, 0x5C, 0x03,
 static const BYTE GAP_OLD_PATCH[12] = { 0x0F, 0x28, 0xC6, 0xF3, 0x0F, 0x5C, 0x03, 0x0F, 0x2F, 0xC7, 0x90, 0x90 };
 static const BYTE JMP_OVER[2] = { 0xEB, 0x0A };  // saut direct en 230C44C : Straight Mode sans Overtake
 
+static const DWORD64 ERS_RVA = 0x23084BE;
+static const DWORD64 ERS_RETURN_RVA = 0x23084CA;
+static const BYTE ERS_CONTEXT[6] = { 0x32, 0xD2, 0xEB, 0x02, 0xB2, 0x01 };
+static const BYTE ERS_ORIGINAL[12] = { 0x0F, 0xB6, 0x45, 0x38, 0xF3, 0x0F, 0x10, 0x2D, 0xCA, 0x6F, 0xCA, 0x03 };
+
 static const DWORD CAR_LAPS = 0x7E4;
+static const DWORD CAR_MODE = 0x200;   // 2 = en course
+static const DWORD CAR_INDEX = 0x710;
+static const int CARS = 32;
 static const DWORD CAR_BATTERY = 0x878;
 static const float OVERTAKE_ENERGY = 0.125f;
 static const DWORD POLL_MS = 100;
@@ -57,6 +76,12 @@ static wchar_t g_dir[MAX_PATH];
 static BYTE* g_exe;
 static BYTE* g_cave;
 static BYTE g_gapPatch[12];
+static BYTE g_ersPatch[12];
+
+// voitures en Overtake Mode, par index ; lu par la cave ERS
+static volatile BYTE g_boost[CARS];
+struct Boost { BYTE* car; float stop; int endLap; };
+static Boost g_boostInfo[CARS];
 
 static void Log(const char* fmt, ...) {
     wchar_t path[MAX_PATH];
@@ -132,8 +157,45 @@ static bool BuildCave() {
     DWORD64 cave = (DWORD64)g_cave;
     memcpy(g_gapPatch + 2, &cave, 8);
     g_gapPatch[10] = 0xFF; g_gapPatch[11] = 0xE0;  // jmp rax
+
+    // cave ERS
+    BYTE* ers = p = g_cave + 0x100;
+    put({ 0x0F, 0xB6, 0x45, 0x38 });        // movzx eax, byte [rbp+0x38]
+    put({ 0x84, 0xC0 });                    // test al, al
+    put({ 0x75, 0x00 });                    // jnz done (l'IA recharge)
+    BYTE* jnz = p - 1;
+    put({ 0x40, 0x84, 0xFF });              // test dil, dil
+    put({ 0x74, 0x00 });                    // jz done (ERS indisponible)
+    BYTE* jz = p - 1;
+    put({ 0x51 });                          // push rcx
+    put({ 0x0F, 0xB6, 0x8B }); { DWORD d = CAR_INDEX; memcpy(p, &d, 4); p += 4; }  // movzx ecx, byte [rbx+0x710]
+    put({ 0x83, 0xE1, CARS - 1 });          // and ecx, CARS-1
+    put({ 0x48, 0xB8 }); put64((DWORD64)g_boost);  // mov rax, g_boost
+    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
+    put({ 0x59 });                          // pop rcx
+    put({ 0x74, 0x02 });                    // je +2
+    put({ 0x32, 0xD2 });                    // xor dl, dl : déployer
+    put({ 0x31, 0xC0 });                    // xor eax, eax (al valait 0)
+    *jnz = (BYTE)(p - (jnz + 1));           // done:
+    *jz = (BYTE)(p - (jz + 1));
+    put({ 0xF3, 0x0F, 0x10, 0x2D });        // movss xmm5, [rip+k]
+    BYTE* disp = p; p += 4;
+    put({ 0xFF, 0x25, 0, 0, 0, 0 }); put64((DWORD64)(g_exe + ERS_RETURN_RVA));  // jmp [rip] -> 23084CA
+    // constante d'origine lue à l'adresse visée par le movss du jeu
+    BYTE* k = p;
+    INT32 orig; memcpy(&orig, ERS_ORIGINAL + 8, 4);
+    memcpy(k, g_exe + ERS_RVA + 12 + orig, 4); p += 4;
+    INT32 rel = (INT32)(k - (disp + 4)); memcpy(disp, &rel, 4);
+    FlushInstructionCache(GetCurrentProcess(), g_cave, p - g_cave);
+
+    g_ersPatch[0] = 0x48; g_ersPatch[1] = 0xB8;  // mov rax, cave ERS
+    DWORD64 e = (DWORD64)ers;
+    memcpy(g_ersPatch + 2, &e, 8);
+    g_ersPatch[10] = 0xFF; g_ersPatch[11] = 0xE0;  // jmp rax
     return true;
 }
+
+static bool g_ersOk = false;
 
 static bool CheckGame() {
     BYTE* lap = g_exe + LAP_RVA;
@@ -145,6 +207,10 @@ static bool CheckGame() {
     bool lapOk = memcmp(lap - 6, LAP_CONTEXT, 6) == 0 &&
                  (memcmp(lap, LAP_ORIGINAL, 2) == 0 || memcmp(lap, NOP2, 2) == 0);
     bool gapOk = memcmp(gap, GAP_ORIGINAL, 12) == 0 || memcmp(gap, GAP_OLD_PATCH, 12) == 0;
+    BYTE* ers = g_exe + ERS_RVA;
+    bool ersOk = Readable(ers - 6, 18) && memcmp(ers - 6, ERS_CONTEXT, 6) == 0 && memcmp(ers, ERS_ORIGINAL, 12) == 0;
+    if (!ersOk) Log("mise à jour ERS inattendue : Overtake Mode donnera la batterie sans forcer le déploiement");
+    g_ersOk = ersOk;
     if (!lapOk || !gapOk) {
         Log("octets inattendus (tour %02X %02X, écart %02X %02X %02X) : autre version du jeu ou autre mod, "
             "rien n'est modifié", lap[0], lap[1], gap[0], gap[10], gap[11]);
@@ -183,13 +249,36 @@ static void GrantOvertake(LONG& read) {
         float after = before + OVERTAKE_ENERGY;
         if (after > 1.0f) after = 1.0f;
         *battery = after;
-        Log("Overtake Mode : voiture %p, tour %d, batterie %.0f%% -> %.0f%%", car, lap, before * 100, after * 100);
+        int idx = car[CAR_INDEX] & (CARS - 1);
+        float stop = after - OVERTAKE_ENERGY;
+        g_boostInfo[idx] = { car, stop > 0.0f ? stop : 0.0f, lap + 1 };
+        g_boost[idx] = 1;
+        Log("Overtake Mode : voiture %d, tour %d, batterie %.0f%% -> %.0f%%", idx, lap, before * 100, after * 100);
+    }
+}
+
+/// fin du déploiement forcé : bonus dépensé, tour suivant terminé, ou voiture plus en course
+static void UpdateBoosts(bool clearAll) {
+    for (int i = 0; i < CARS; i++) {
+        if (!g_boost[i]) continue;
+        Boost& b = g_boostInfo[i];
+        bool end = clearAll || !Readable(b.car + CAR_MODE, 1) || !Readable(b.car + CAR_BATTERY, 4);
+        if (!end) {
+            float battery = *(float*)(b.car + CAR_BATTERY);
+            int lap = *(int*)(b.car + CAR_LAPS);
+            end = battery <= b.stop || lap > b.endLap || b.car[CAR_MODE] != 2;
+        }
+        if (end) g_boost[i] = 0;
     }
 }
 
 static DWORD WINAPI Worker(LPVOID) {
     g_exe = (BYTE*)GetModuleHandleW(nullptr);
     if (!CheckGame() || !BuildCave()) return 0;
+    if (g_ersOk) {
+        if (WriteCode(g_exe + ERS_RVA, g_ersPatch, 12)) Log("Overtake Mode : déploiement ERS forcé tant que le bonus n'est pas dépensé");
+        else g_ersOk = false;
+    }
     int applied = -1;
     LONG read = 0;
     for (;;) {
@@ -203,8 +292,10 @@ static DWORD WINAPI Worker(LPVOID) {
                      : "règle d'origine (DRS à moins d'1 s, après 2 tours)");
             applied = want;
             read = g_ring.written;
+            UpdateBoosts(true);
         }
         if (applied == 1) GrantOvertake(read);
+        UpdateBoosts(false);
         Sleep(POLL_MS);
     }
 }

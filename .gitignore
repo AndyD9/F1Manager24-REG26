@@ -24,3 +24,6 @@ tools_native/test/dummy_addr.txt
 
 # DLL compilée par tools_native/build.bat (fournie dans la release)
 ue4ss/Reg2026/Reg2026Patch.dll
+tools_native/test/cave.bin
+tools_native/test/cave_test.exe
+tools_native/test/cave_test.obj

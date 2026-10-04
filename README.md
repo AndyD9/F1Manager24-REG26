@@ -8,7 +8,7 @@ Straight Mode (aéro active), Overtake Mode et ERS 350 kW.
 | Partie | Effet en course |
 |---|---|
 | **Straight Mode** pour toute la grille, dès le 1er tour — `Reg2026Patch.dll` | **Réel** : le jeu ouvre lui-même le DRS de toutes les voitures dans les zones, avec son vrai gain de vitesse. Blocages gardés : voiture de sécurité, drapeaux, pluie. |
-| **Overtake Mode** — `Reg2026Patch.dll` | **Réel** : à moins d'1 s au point de détection, +12,5 % de batterie ERS (0,5 MJ sur 4 MJ), une fois par tour. |
+| **Overtake Mode** — `Reg2026Patch.dll` | **Réel** : à moins d'1 s au point de détection, +12,5 % de batterie ERS (0,5 MJ sur 4 MJ), une fois par tour, dépensés en déploiement forcé. |
 | Zones Straight Mode — `ue4ss/Reg2026` | Zones du jeu + zones ajoutées au nombre annoncé par la FIA (ZONES_2026.md). |
 | Cases STRAIGHT / OVERTAKE — `ui_mod` | Interface : bandeau de chaque pilote, au style du jeu. |
 | Valeurs 2026 (ERS, aéro, air sale) — pak `zzz_Reg2026_P` | **Réel**. À construire soi-même (voir `GUIDE_PAK_2026.md`), non distribué car il contient des données du jeu. |
