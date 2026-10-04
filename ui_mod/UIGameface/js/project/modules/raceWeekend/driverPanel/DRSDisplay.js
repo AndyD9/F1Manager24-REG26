@@ -1,4 +1,4 @@
-define(["require", "exports", "common/components/DataStoreComponent", "common/core/DataStore", "common/lib/classnames", "common/lib/preact", "common/util/CSSUtil", "project/data/GameTypes"], function (require, exports, DataStoreComponent, DS, classnames_1, preact, CSSUtil_1, GameTypes_1) {
+define(["require", "exports", "common/components/DataStoreComponent", "common/core/DataStore", "project/modules/raceWeekend/driverPanel/Reg2026Texts", "common/lib/classnames", "common/lib/preact", "common/util/CSSUtil", "project/data/GameTypes"], function (require, exports, DataStoreComponent, DS, Reg2026Texts_1, classnames_1, preact, CSSUtil_1, GameTypes_1) {
     "use strict";
     // Reg2026 : la case DRS du bandeau pilote est remplacée par deux cases STRAIGHT / OVERTAKE,
     // dessinées avec les mêmes classes que la case DRS d'origine (DRSDisplay.css).

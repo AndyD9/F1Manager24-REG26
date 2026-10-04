@@ -49,11 +49,19 @@
 //    (~30 par seconde de simulation) : à 0,0006 par appel, +1,8 % par pas à fond au-delà de 290 km/h pour
 //    un déploiement à −3 % ; 0,0007 donne le rapport réel 250 kW / 350 kW = 0,7.
 //
+// 5. Stratégies ERS 2026 (stratégie de la voiture en +0xEF2 ; l'IA roule surtout en 2, Déploiement, gardée telle quelle) :
+//    - 3 Top-Up -> RÉSERVE : jamais de déploiement (le jeu recharge dans cette stratégie), sauf en Overtake Mode
+//      ou pour défendre quand une voiture est à moins d'1 s derrière (UpdateDefence : écart en distance +0x194
+//      divisé par la vitesse de celle qui suit, positions en +0x7E0).
+//    - 1 Récupération -> LIFT & COAST : plus de déploiement au-delà de 250 km/h et recharge au-dessus, même sans
+//      super clipping.
+//
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
 #include <initializer_list>
+#include <stddef.h>
 
 static const DWORD64 LAP_RVA = 0x230C335;
 static const BYTE LAP_CONTEXT[6] = { 0x3B, 0x8F, 0x70, 0x08, 0x00, 0x00 };
@@ -80,6 +88,12 @@ static const DWORD CAR_LAPS = 0x7E4;
 static const DWORD CAR_DRS_LAP = 0x870;  // tour à partir duquel le jeu d'origine autorise le DRS (départ, relance)
 static const DWORD CAR_MODE = 0x200;   // 2 = en course
 static const DWORD CAR_INDEX = 0x710;
+static const DWORD CAR_POS = 0x7E0;        // position en course, 0 = en tête
+static const DWORD CAR_DIST = 0x194;       // distance totale parcourue (m)
+static const DWORD CAR_SPEED = 0x198;      // m/s
+static const DWORD CAR_STRATEGY = 0xEF2;   // stratégie ERS : 0 Neutre, 1 Récupération, 2 Déploiement, 3 Top-Up
+static const DWORD CAR_STRIDE = 0x10D8;
+static const int GRID = 22;
 static const int CARS = 32;
 static const DWORD CAR_BATTERY = 0x878;
 static const float OVERTAKE_ENERGY = 0.125f;
@@ -102,13 +116,19 @@ static BYTE g_clipPatch[19];
 
 // lu par la cave ERS : voitures en Overtake Mode (par index) et réglages du super clipping
 struct ErsConfig {
-    volatile BYTE boost[CARS];  // +0x00
-    volatile LONG clipOn;       // +0x20
-    float limit;                // +0x24 m/s
-    float limitBoost;           // +0x28 m/s
-    float harvest;              // +0x2C batterie par appel
+    volatile BYTE boost[CARS];   // +0x00 Overtake Mode
+    volatile LONG clipOn;        // +0x20
+    float limit;                 // +0x24 m/s
+    float limitBoost;            // +0x28 m/s
+    float harvest;               // +0x2C batterie par appel
+    volatile BYTE defend[CARS];  // +0x30 voiture à moins d'1 s derrière (stratégie RÉSERVE)
+    float limitLiftCoast;        // +0x50 m/s (stratégie LIFT & COAST)
+    DWORD pad;                   // +0x54
+    BYTE* volatile lastCar;      // +0x58 dernier objet voiture vu par la cave (pour trouver le tableau)
 };
-static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.0007f };
+static_assert(offsetof(ErsConfig, defend) == 0x30 && offsetof(ErsConfig, limitLiftCoast) == 0x50 &&
+              offsetof(ErsConfig, lastCar) == 0x58, "décalages lus par les caves");
+static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.0007f, {}, 250.0f / 3.6f, 0, nullptr };
 #define g_boost g_cfg.boost
 struct Boost { BYTE* car; float stop; int endLap; };
 static Boost g_boostInfo[CARS];
@@ -229,26 +249,44 @@ static bool BuildCave() {
     put({ 0x0F, 0xB6, 0x8B }); { DWORD d = CAR_INDEX; memcpy(p, &d, 4); p += 4; }  // movzx ecx, byte [rbx+0x710]
     put({ 0x83, 0xE1, CARS - 1 });          // and ecx, CARS-1
     put({ 0x48, 0xB8 }); put64((DWORD64)&g_cfg);  // mov rax, &g_cfg
-    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
-    BYTE* notBoost = jcc(0x74);             // jz notBoost
+    put({ 0x48, 0x89, 0x58, 0x58 });        // mov [rax+0x58], rbx (lastCar)
+    // RÉSERVE (Top-Up) : pas de déploiement, sauf pour attaquer (Overtake Mode) ou défendre
+    put({ 0x80, 0xBB, 0xF2, 0x0E, 0x00, 0x00, 0x03 });  // cmp byte [rbx+0xEF2], 3
+    BYTE* notRes = jcc(0x75);               // jnz notRes
+    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0 (Overtake Mode)
+    BYTE* r1 = jcc(0x75);                   // jnz attack
+    put({ 0x80, 0x7C, 0x08, 0x30, 0x00 });  // cmp byte [rax+rcx+0x30], 0 (défense)
+    BYTE* r2 = jcc(0x75);                   // jnz attack
+    put({ 0xB2, 0x01 });                    // mov dl, 1 : garder l'énergie
+    BYTE* r3 = jcc(0xEB);                   // jmp limits
+    land(notRes);
+    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0 (Overtake Mode)
+    BYTE* r4 = jcc(0x74);                   // jz limits
+    land(r1); land(r2);                     // attack:
     put({ 0x80, 0x7D, 0x38, 0x00 });        // cmp byte [rbp+0x38], 0 : l'IA recharge ?
-    BYTE* j1 = jcc(0x75);                   // jnz limBoost
+    BYTE* r5 = jcc(0x75);                   // jnz limits
     put({ 0x40, 0x84, 0xFF });              // test dil, dil : ERS disponible ?
-    BYTE* j2 = jcc(0x74);                   // jz limBoost
-    put({ 0x32, 0xD2 });                    // xor dl, dl : déployer (Overtake Mode)
-    land(j1); land(j2);                     // limBoost:
-    put({ 0xF3, 0x0F, 0x10, 0x40, 0x28 });  // movss xmm0, [rax+0x28]
-    BYTE* j3 = jcc(0xEB);                   // jmp clip
-    land(notBoost);
-    put({ 0xF3, 0x0F, 0x10, 0x40, 0x24 });  // movss xmm0, [rax+0x24]
-    land(j3);                               // clip:
+    BYTE* r6 = jcc(0x74);                   // jz limits
+    put({ 0x32, 0xD2 });                    // xor dl, dl : déployer
+    land(r3); land(r4); land(r5); land(r6); // limits:
+    // vitesse au-delà de laquelle on ne déploie plus : LIFT & COAST toujours, sinon super clipping
+    put({ 0x80, 0xBB, 0xF2, 0x0E, 0x00, 0x00, 0x01 });  // cmp byte [rbx+0xEF2], 1
+    BYTE* l1 = jcc(0x75);                   // jnz notLnc
+    put({ 0xF3, 0x0F, 0x10, 0x40, 0x50 });  // movss xmm0, [rax+0x50]
+    BYTE* l2 = jcc(0xEB);                   // jmp have
+    land(l1);                               // notLnc:
     put({ 0x83, 0x78, 0x20, 0x00 });        // cmp dword [rax+0x20], 0
-    BYTE* j4 = jcc(0x74);                   // jz done
+    BYTE* l3 = jcc(0x74);                   // jz done
+    put({ 0xF3, 0x0F, 0x10, 0x40, 0x24 });  // movss xmm0, [rax+0x24]
+    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
+    BYTE* l4 = jcc(0x74);                   // jz have
+    put({ 0xF3, 0x0F, 0x10, 0x40, 0x28 });  // movss xmm0, [rax+0x28] (Overtake Mode)
+    land(l2); land(l4);                     // have:
     put({ 0xF3, 0x0F, 0x10, 0x8B, 0x98, 0x01, 0x00, 0x00 });  // movss xmm1, [rbx+0x198] (vitesse)
     put({ 0x0F, 0x2F, 0xC8 });              // comiss xmm1, xmm0
-    BYTE* j5 = jcc(0x76);                   // jbe done
+    BYTE* l5 = jcc(0x76);                   // jbe done
     put({ 0xB2, 0x01 });                    // mov dl, 1 : plus de déploiement
-    land(j4); land(j5);                     // done:
+    land(l3); land(l5);                     // done:
     put({ 0x59 });                          // pop rcx
     put({ 0x0F, 0xB6, 0x45, 0x38 });        // movzx eax, byte [rbp+0x38]
     put({ 0xF3, 0x0F, 0x10, 0x2D });        // movss xmm5, [rip+k]
@@ -271,15 +309,20 @@ static bool BuildCave() {
     put({ 0x4C, 0x8B, 0xBC, 0x24, 0xE8, 0x00, 0x00, 0x00 });  // mov r15, [rsp+0xE8] (d'origine)
     put({ 0x51 });                          // push rcx
     put({ 0x48, 0xB8 }); put64((DWORD64)&g_cfg);  // mov rax, &g_cfg
-    put({ 0x83, 0x78, 0x20, 0x00 });        // cmp dword [rax+0x20], 0
-    BYTE* c1 = jcc(0x74);                   // jz done
     put({ 0x0F, 0xB6, 0x8B }); { DWORD d = CAR_INDEX; memcpy(p, &d, 4); p += 4; }  // movzx ecx, byte [rbx+0x710]
     put({ 0x83, 0xE1, CARS - 1 });          // and ecx, CARS-1
+    put({ 0x80, 0xBB, 0xF2, 0x0E, 0x00, 0x00, 0x01 });  // cmp byte [rbx+0xEF2], 1 (LIFT & COAST)
+    BYTE* c0 = jcc(0x75);                   // jnz notLnc
+    put({ 0xF3, 0x0F, 0x10, 0x48, 0x50 });  // movss xmm1, [rax+0x50]
+    BYTE* c5 = jcc(0xEB);                   // jmp cmp
+    land(c0);                               // notLnc:
+    put({ 0x83, 0x78, 0x20, 0x00 });        // cmp dword [rax+0x20], 0
+    BYTE* c1 = jcc(0x74);                   // jz done
     put({ 0xF3, 0x0F, 0x10, 0x48, 0x24 });  // movss xmm1, [rax+0x24]
     put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
     BYTE* c2 = jcc(0x74);                   // jz cmp
     put({ 0xF3, 0x0F, 0x10, 0x48, 0x28 });  // movss xmm1, [rax+0x28] (Overtake Mode)
-    land(c2);                               // cmp:
+    land(c2); land(c5);                     // cmp:
     put({ 0x0F, 0x2F, 0x8B, 0x98, 0x01, 0x00, 0x00 });  // comiss xmm1, [rbx+0x198] (vitesse)
     BYTE* c3 = jcc(0x73);                   // jae done (limite >= vitesse)
     put({ 0x0F, 0x57, 0xC9 });              // xorps xmm1, xmm1
@@ -375,6 +418,37 @@ static void GrantOvertake(LONG& read) {
     }
 }
 
+/// RÉSERVE : marque les voitures qui ont une voiture à moins d'1 s derrière elles (écart en distance divisé
+/// par la vitesse de la voiture qui suit). Le tableau des voitures est retrouvé depuis le dernier objet voiture
+/// vu par la cave ERS.
+static void UpdateDefence() {
+    BYTE* last = g_cfg.lastCar;
+    BYTE def[CARS] = {};
+    BYTE* byPos[GRID] = {};
+    if (last && Readable(last + CAR_INDEX, 1)) {
+        int idx = last[CAR_INDEX];
+        BYTE* base = last - (DWORD64)idx * CAR_STRIDE;
+        bool ok = idx < GRID && Readable(base, CAR_STRIDE * GRID);
+        for (int i = 0; ok && i < GRID; i++) {
+            BYTE* c = base + (DWORD64)i * CAR_STRIDE;
+            if (c[CAR_INDEX] != i) { ok = false; break; }
+            int pos = *(int*)(c + CAR_POS);
+            if (c[CAR_MODE] == 2 && pos >= 0 && pos < GRID) byPos[pos] = c;
+        }
+        for (int pos = 0; ok && pos + 1 < GRID; pos++) {
+            BYTE* a = byPos[pos];
+            BYTE* b = byPos[pos + 1];
+            if (!a || !b) continue;
+            int lap = *(int*)(a + CAR_LAPS);
+            if (lap < *(int*)(a + CAR_DRS_LAP)) continue;  // comme Overtake Mode : pas au départ ni aux relances
+            float gap = *(float*)(a + CAR_DIST) - *(float*)(b + CAR_DIST);
+            float v = *(float*)(b + CAR_SPEED);
+            if (gap > 0.0f && v > 1.0f && gap / v < 1.0f) def[a[CAR_INDEX] & (CARS - 1)] = 1;
+        }
+    }
+    for (int i = 0; i < CARS; i++) g_cfg.defend[i] = def[i];
+}
+
 /// fin du déploiement forcé : bonus dépensé, tour suivant terminé, ou voiture plus en course
 static void UpdateBoosts(bool clearAll) {
     for (int i = 0; i < CARS; i++) {
@@ -415,6 +489,7 @@ static DWORD WINAPI Worker(LPVOID) {
         }
         if (applied == 1) GrantOvertake(read);
         UpdateBoosts(false);
+        UpdateDefence();
         static int tick = 0;
         if (tick++ % 10 == 0) {
             if (applied == 1) ReadClipConfig();

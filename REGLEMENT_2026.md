@@ -49,7 +49,8 @@ Sources : [Motor Sport Magazine](https://www.motorsportmagazine.com/articles/sin
 | Puissance électrique réduite au-delà de 290 km/h, super clipping (recharge à fond en bout de ligne droite) | Optionnel (`superclipping.ini`, F6) : plus de déploiement au-delà de 290 km/h (337 en Overtake Mode) ; au-dessus, à fond, recharge 0,0007 par appel ERS (~+2 % par pas de simulation pour un déploiement à −3 %, rapport 250 kW / 350 kW) | ✅ mesuré à Monza : 0 déploiement au-delà de 290 km/h, recharge +1,8 % par pas à 0,0006 |
 | Appui −30 % (−30 kg) | Pak : `AeroSpeedMultipliers` virages lents −2 %, moyens −5 %, rapides −8 % | 🧪 à valider par des temps au tour |
 | Moins d'air sale (90 % d'appui à 20 m) | Pak : `DirtyAirMaxDist` 150 (220), `DirtyAirSpeedMultipliers` 0,93 (0,90) | ✅ |
-| Boost manuel | Modes ERS du jeu | ✅ existe déjà |
+| Boost manuel | Stratégie ERS **BOOST** (ex-Déploiement, comportement du jeu, stratégie de course de l'IA) | ✅ |
+| Gestion de l'énergie | Stratégies ERS renommées (`ui_mod`, Reg2026Texts.js) et comportements dans `Reg2026Patch.dll` (stratégie en +0xEF2) : **ÉQUILIBRÉ** (ex-Neutre, jeu) ; **RÉSERVE** (ex-Top-Up) : pas de déploiement sauf Overtake Mode ou défense, voiture à moins d'1 s derrière (positions +0x7E0, distance +0x194) ; **LIFT & COAST** (ex-Récupération) : plus d'électrique au-delà de 250 km/h et recharge au-dessus | 🧪 à voir en course |
 
 ## 4. Reste à faire
 
