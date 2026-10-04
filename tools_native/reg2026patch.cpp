@@ -36,9 +36,16 @@
 //
 // 4. Super clipping (optionnel, superclipping.ini, touche F6 côté Lua). Dans la même cave : au-delà de
 //    vitesse_max (vitesse en m/s en +0x198 de l'objet voiture), plus de déploiement (dl = 1) ; vitesse_max_overtake
-//    pour une voiture en Overtake Mode. Au-dessus, sans freiner (accélération +0x19C >= 0), la batterie se
-//    recharge : on ajoute « recharge » à xmm12, la batterie de départ que le jeu utilise en 230859B pour
-//    calculer la nouvelle valeur (bornée à 1 juste après). Mesuré : un déploiement coûte ~0,03 par appel.
+//    pour une voiture en Overtake Mode. La recharge se fait ailleurs, car la cave ERS n'est atteinte que
+//    quand l'IA prend une décision (230B990 vrai). Tous les chemins se rejoignent en 230856D, juste avant
+//    le calcul de la nouvelle batterie (230859B : xmm0 = débit * 1/30 + xmm12, bornée à 1 ensuite) :
+//        230856D  mov r15, [rsp + 0xE8]          ; 4C 8B BC 24 E8 00 00 00
+//        2308575  movaps xmm1, xmm2              ; 0F 28 CA
+//        2308578  mulss xmm1, [rip + 0x3CA17C4]  ; F3 0F 59 0D C4 17 CA 03
+//    Ces 19 octets deviennent « mov rax, cave ; jmp rax » + 7 nop (rax n'est plus lu avant d'être réécrit,
+//    et aucun saut ne vise 2308575 ni 2308578). Au-dessus de la vitesse limite, sans freiner (accélération
+//    +0x19C >= 0), la cave ajoute « recharge » à xmm12 (batterie de départ). Mesuré en course à Monza :
+//    plus aucun déploiement au-delà de 290 km/h.
 //
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
@@ -62,6 +69,11 @@ static const DWORD64 ERS_RETURN_RVA = 0x23084CA;
 static const BYTE ERS_CONTEXT[6] = { 0x32, 0xD2, 0xEB, 0x02, 0xB2, 0x01 };
 static const BYTE ERS_ORIGINAL[12] = { 0x0F, 0xB6, 0x45, 0x38, 0xF3, 0x0F, 0x10, 0x2D, 0xCA, 0x6F, 0xCA, 0x03 };
 
+static const DWORD64 CLIP_RVA = 0x230856D;
+static const DWORD64 CLIP_RETURN_RVA = 0x2308580;
+static const BYTE CLIP_ORIGINAL[19] = { 0x4C, 0x8B, 0xBC, 0x24, 0xE8, 0x00, 0x00, 0x00, 0x0F, 0x28, 0xCA,
+                                        0xF3, 0x0F, 0x59, 0x0D, 0xC4, 0x17, 0xCA, 0x03 };
+
 static const DWORD CAR_LAPS = 0x7E4;
 static const DWORD CAR_MODE = 0x200;   // 2 = en course
 static const DWORD CAR_INDEX = 0x710;
@@ -83,6 +95,7 @@ static BYTE* g_exe;
 static BYTE* g_cave;
 static BYTE g_gapPatch[12];
 static BYTE g_ersPatch[12];
+static BYTE g_clipPatch[19];
 
 // lu par la cave ERS : voitures en Overtake Mode (par index) et réglages du super clipping
 struct ErsConfig {
@@ -232,11 +245,7 @@ static bool BuildCave() {
     put({ 0x0F, 0x2F, 0xC8 });              // comiss xmm1, xmm0
     BYTE* j5 = jcc(0x76);                   // jbe done
     put({ 0xB2, 0x01 });                    // mov dl, 1 : plus de déploiement
-    put({ 0x0F, 0x57, 0xC0 });              // xorps xmm0, xmm0
-    put({ 0x0F, 0x2F, 0x83, 0x9C, 0x01, 0x00, 0x00 });  // comiss xmm0, [rbx+0x19C] (accélération)
-    BYTE* j6 = jcc(0x77);                   // ja done (freinage : le jeu s'en charge)
-    put({ 0xF3, 0x44, 0x0F, 0x58, 0x60, 0x2C });  // addss xmm12, [rax+0x2C] : recharge
-    land(j4); land(j5); land(j6);           // done:
+    land(j4); land(j5);                     // done:
     put({ 0x59 });                          // pop rcx
     put({ 0x0F, 0xB6, 0x45, 0x38 });        // movzx eax, byte [rbp+0x38]
     put({ 0xF3, 0x0F, 0x10, 0x2D });        // movss xmm5, [rip+k]
@@ -253,10 +262,49 @@ static bool BuildCave() {
     DWORD64 e = (DWORD64)ers;
     memcpy(g_ersPatch + 2, &e, 8);
     g_ersPatch[10] = 0xFF; g_ersPatch[11] = 0xE0;  // jmp rax
+
+    // cave de recharge (super clipping)
+    BYTE* clip = p = g_cave + 0x200;
+    put({ 0x4C, 0x8B, 0xBC, 0x24, 0xE8, 0x00, 0x00, 0x00 });  // mov r15, [rsp+0xE8] (d'origine)
+    put({ 0x51 });                          // push rcx
+    put({ 0x48, 0xB8 }); put64((DWORD64)&g_cfg);  // mov rax, &g_cfg
+    put({ 0x83, 0x78, 0x20, 0x00 });        // cmp dword [rax+0x20], 0
+    BYTE* c1 = jcc(0x74);                   // jz done
+    put({ 0x0F, 0xB6, 0x8B }); { DWORD d = CAR_INDEX; memcpy(p, &d, 4); p += 4; }  // movzx ecx, byte [rbx+0x710]
+    put({ 0x83, 0xE1, CARS - 1 });          // and ecx, CARS-1
+    put({ 0xF3, 0x0F, 0x10, 0x48, 0x24 });  // movss xmm1, [rax+0x24]
+    put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
+    BYTE* c2 = jcc(0x74);                   // jz cmp
+    put({ 0xF3, 0x0F, 0x10, 0x48, 0x28 });  // movss xmm1, [rax+0x28] (Overtake Mode)
+    land(c2);                               // cmp:
+    put({ 0x0F, 0x2F, 0x8B, 0x98, 0x01, 0x00, 0x00 });  // comiss xmm1, [rbx+0x198] (vitesse)
+    BYTE* c3 = jcc(0x73);                   // jae done (limite >= vitesse)
+    put({ 0x0F, 0x57, 0xC9 });              // xorps xmm1, xmm1
+    put({ 0x0F, 0x2F, 0x8B, 0x9C, 0x01, 0x00, 0x00 });  // comiss xmm1, [rbx+0x19C] (accélération)
+    BYTE* c4 = jcc(0x77);                   // ja done (freinage)
+    put({ 0xF3, 0x44, 0x0F, 0x58, 0x60, 0x2C });  // addss xmm12, [rax+0x2C] : recharge
+    land(c1); land(c3); land(c4);           // done:
+    put({ 0x59 });                          // pop rcx
+    put({ 0x0F, 0x28, 0xCA });              // movaps xmm1, xmm2 (d'origine)
+    put({ 0xF3, 0x0F, 0x59, 0x0D });        // mulss xmm1, [rip+k] (d'origine)
+    BYTE* disp2 = p; p += 4;
+    put({ 0xFF, 0x25, 0, 0, 0, 0 }); put64((DWORD64)(g_exe + CLIP_RETURN_RVA));  // jmp [rip] -> 2308580
+    BYTE* k2 = p;
+    INT32 orig2; memcpy(&orig2, CLIP_ORIGINAL + 15, 4);
+    memcpy(k2, g_exe + CLIP_RETURN_RVA + orig2, 4); p += 4;
+    INT32 rel2 = (INT32)(k2 - (disp2 + 4)); memcpy(disp2, &rel2, 4);
+    FlushInstructionCache(GetCurrentProcess(), g_cave, p - g_cave);
+
+    g_clipPatch[0] = 0x48; g_clipPatch[1] = 0xB8;  // mov rax, cave de recharge
+    DWORD64 c = (DWORD64)clip;
+    memcpy(g_clipPatch + 2, &c, 8);
+    g_clipPatch[10] = 0xFF; g_clipPatch[11] = 0xE0;  // jmp rax
+    memset(g_clipPatch + 12, 0x90, 7);
     return true;
 }
 
 static bool g_ersOk = false;
+static bool g_clipOk = false;
 
 static bool CheckGame() {
     BYTE* lap = g_exe + LAP_RVA;
@@ -272,6 +320,9 @@ static bool CheckGame() {
     bool ersOk = Readable(ers - 6, 18) && memcmp(ers - 6, ERS_CONTEXT, 6) == 0 && memcmp(ers, ERS_ORIGINAL, 12) == 0;
     if (!ersOk) Log("mise à jour ERS inattendue : Overtake Mode donnera la batterie sans forcer le déploiement");
     g_ersOk = ersOk;
+    BYTE* clip = g_exe + CLIP_RVA;
+    g_clipOk = ersOk && Readable(clip, 19) && memcmp(clip, CLIP_ORIGINAL, 19) == 0;
+    if (ersOk && !g_clipOk) Log("calcul de batterie inattendu : super clipping sans recharge");
     if (!lapOk || !gapOk) {
         Log("octets inattendus (tour %02X %02X, écart %02X %02X %02X) : autre version du jeu ou autre mod, "
             "rien n'est modifié", lap[0], lap[1], gap[0], gap[10], gap[11]);
@@ -339,6 +390,7 @@ static DWORD WINAPI Worker(LPVOID) {
     if (g_ersOk) {
         if (WriteCode(g_exe + ERS_RVA, g_ersPatch, 12)) Log("Overtake Mode : déploiement ERS forcé tant que le bonus n'est pas dépensé");
         else g_ersOk = false;
+        if (g_clipOk && !WriteCode(g_exe + CLIP_RVA, g_clipPatch, 19)) g_clipOk = false;
     }
     int applied = -1;
     LONG read = 0;
