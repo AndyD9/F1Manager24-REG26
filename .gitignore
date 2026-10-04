@@ -1,0 +1,15 @@
+# Clé AES du jeu : jamais versionnée
+aes_key.txt
+
+# Fichiers extraits du jeu et paks générés (contenu protégé de F1 Manager 2024)
+extract/
+build/
+
+# Outils tiers (à télécharger séparément)
+tools/
+
+__pycache__/
+*.pyc
+
+# Ancien HUD, remplacé par ue4ss/Reg2026 + ui_mod
+ue4ss/Reg2026HUD/

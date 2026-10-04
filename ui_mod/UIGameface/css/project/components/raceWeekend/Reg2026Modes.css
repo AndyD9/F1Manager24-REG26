@@ -1,0 +1,48 @@
+/* Reg2026 : cases STRAIGHT / OVERTAKE du bandeau pilote.
+   La forme vient de DRSDisplay.css ; ici seulement les couleurs propres à chaque mode. */
+.Reg2026Modes_root {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+/* STRAIGHT active : couleur DRS du jeu (suit le mode daltonien) */
+.Reg2026Modes_root .Reg2026Mode_border.straight.active {
+  background-color: rgba(var(--drsGreen-triplet), 0.2);
+  border-top-color: var(--drsGreen);
+  border-bottom-color: var(--drsGreen);
+  border-left-color: var(--drsGreen);
+  border-right-color: var(--drsGreen);
+}
+.Reg2026Modes_root .Reg2026Mode_label.straight.active {
+  color: var(--drsGreen);
+}
+
+/* OVERTAKE active : couleur ERS du jeu */
+.Reg2026Modes_root .Reg2026Mode_border.overtake.active {
+  background-color: rgba(var(--ersColor-triplet), 0.2);
+  border-top-color: var(--ersColor);
+  border-bottom-color: var(--ersColor);
+  border-left-color: var(--ersColor);
+  border-right-color: var(--ersColor);
+}
+.Reg2026Modes_root .Reg2026Mode_label.overtake.active {
+  color: var(--ersColor);
+}
+
+/* OVERTAKE disponible (moins d'1 s au point de détection) : contour ERS atténué */
+.Reg2026Modes_root .Reg2026Mode_root.overtake.available {
+  background-color: rgba(var(--blackColor-triplet), 0.8);
+}
+.Reg2026Modes_root .Reg2026Mode_border.overtake.available {
+  background-color: rgba(var(--ersColor-triplet), 0.08);
+  border-top-color: var(--ersColor);
+  border-bottom-color: var(--ersColor);
+  border-left-color: var(--ersColor);
+  border-right-color: var(--ersColor);
+  opacity: 0.5;
+}
+.Reg2026Modes_root .Reg2026Mode_label.overtake.available {
+  color: var(--ersColor);
+  opacity: 0.7;
+}
