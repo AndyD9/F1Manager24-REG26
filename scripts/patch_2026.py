@@ -42,8 +42,25 @@ PATCHES = {
     ],
 }
 
-# Courbe DRS : on multiplie la clé à 360 km/h (valeur + tangentes)
-DRS_CURVE = ("DRSAccelerationSpeedCurce", 360.0, 1.0, 0.75)
+# Vecteurs (X = voiture la moins bonne, Y = la meilleure) : asset -> (champ, occurrence, (X, Y) d'origine, nouveau)
+# Aéro 2026 (REGLEMENT_2026.md) : appui −30 % compensé en partie par −30 kg, donc vitesse en virage un peu
+# plus basse, surtout en courbe rapide ; moins d'air sale ; Straight Mode (avant + arrière, traînée −55 %)
+# nettement plus efficace que l'ancien DRS.
+VEC_PATCHES = {
+    "CarStatsDataAsset": [
+        ("AeroSpeedMultipliers", 0, (0.831, 0.964), (0.814, 0.945)),  # virages lents −2 %
+        ("AeroSpeedMultipliers", 1, (0.769, 1.0), (0.731, 0.95)),      # virages moyens −5 %
+        ("AeroSpeedMultipliers", 2, (0.834, 1.0), (0.767, 0.92)),      # virages rapides −8 %
+        ("DirtyAirSpeedMultipliers", 0, (0.9, 1.0), (0.93, 1.0)),
+        ("DirtyAirSpeedMultipliers", 1, (0.9, 1.0), (0.93, 1.0)),
+        ("DirtyAirSpeedMultipliers", 2, (0.9, 1.0), (0.93, 1.0)),
+        ("DRSTopSpeedMultiplier", 0, (1.0155, 1.0431), (1.03, 1.06)),
+        ("DRSAccelerationMultiplier", 0, (1.0, 1.146), (1.05, 1.20)),
+    ],
+}
+
+# Courbe DRS : None = courbe d'origine du jeu (gain du Straight Mode réglé par VEC_PATCHES)
+DRS_CURVE = None
 
 
 def find_props(node, name, found):
@@ -70,6 +87,18 @@ def find_curve_keys(node, found):
     return found
 
 
+def find_vectors(node, name, found):
+    if isinstance(node, dict):
+        if node.get("Name") == name and isinstance(node.get("Value"), dict) and "X" in node["Value"]:
+            found.append(node)
+        for v in node.values():
+            find_vectors(v, name, found)
+    elif isinstance(node, list):
+        for v in node:
+            find_vectors(v, name, found)
+    return found
+
+
 def as_float(v):
     return float(str(v).replace("+", ""))
 
@@ -80,8 +109,15 @@ def close(a, b):
 
 def main():
     DST.mkdir(parents=True, exist_ok=True)
-    for asset, patches in PATCHES.items():
+    for asset in sorted(set(PATCHES) | set(VEC_PATCHES)):
         data = json.loads((SRC / f"{asset}.json").read_text(encoding="utf-8"))
+        for name, occ, old, new in VEC_PATCHES.get(asset, []):
+            vec = find_vectors(data["Exports"], name, [])[occ]["Value"]
+            cur = (as_float(vec["X"]), as_float(vec["Y"]))
+            assert close(cur[0], old[0]) and close(cur[1], old[1]), f"{asset}.{name}[{occ}] = {cur}, attendu {old}"
+            vec["X"], vec["Y"] = new
+            print(f"{asset}.{name}[{occ}]: {cur} -> {new}")
+        patches = PATCHES.get(asset, [])
         for name, occ, old, new in patches:
             props = find_props(data["Exports"], name, [])
             prop = props[occ]
@@ -91,6 +127,12 @@ def main():
             print(f"{asset}.{name}[{occ}]: {cur:g} -> {new:g}")
         (DST / f"{asset}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
 
+    if DRS_CURVE is None:
+        # courbe d'origine : le fichier reste celui du jeu
+        asset = "DRSAccelerationSpeedCurce"
+        (DST / f"{asset}.json").write_text((SRC / f"{asset}.json").read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"{asset}: courbe d'origine")
+        return
     asset, t, old, new = DRS_CURVE
     data = json.loads((SRC / f"{asset}.json").read_text(encoding="utf-8"))
     keys = [k for k in find_curve_keys(data["Exports"], []) if close(as_float(k["Time"]), t)]

@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MIN_LENGTH_M = 400  # longueur minimale d'une ligne droite retenue
+SHORT_LENGTH_M = 200  # longueur minimale d'une ligne droite candidate de secours
 
 
 def find_prop(node, name):
@@ -101,6 +102,8 @@ def analyze(path):
         drs_end=tp("m_DRSZoneEnd"),
         node_dist_m=[round(sum(seg[:i]), 1) for i in range(n)],  # distance depuis le point 0
         straights=[s for s in result if s["length_m"] >= MIN_LENGTH_M],
+        # lignes droites plus courtes, candidates quand la FIA prévoit plus de zones (gen_zones_lua.py)
+        short_straights=[s for s in result if SHORT_LENGTH_M <= s["length_m"] < MIN_LENGTH_M],
     )
 
 

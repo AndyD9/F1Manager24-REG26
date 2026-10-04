@@ -36,26 +36,22 @@ Sources : [Motor Sport Magazine](https://www.motorsportmagazine.com/articles/sin
 
 | Règle 2026 | Dans le mod | État |
 |---|---|---|
-| Straight Mode pour tous, sans écart | Patch : suppression du test « > 1 s » au point de détection | ✅ fait, mesuré à Monza (toute la grille au niveau « avec DRS ») |
-| Zones Straight Mode désignées | Zones DRS du jeu + 26 zones ajoutées (ZONES_2026.md), enchaînées par le jeu | ✅ fait ; à aligner sur les zones FIA officielles circuit par circuit |
-| Dès le 1er tour | Patch de la condition de tour (exe+0x230C335, objet voiture +0x870) | 🧪 codé, à tester en course |
-| Sous voiture de sécurité (si sec) | Le jeu bloque | ➖ garder le blocage : aucun effet utile à vitesse de safety car |
-| Pluie : mode partiel | Le jeu bloque complètement sur piste mouillée | ➖ approximation acceptable ; option : autoriser avec un gain réduit |
-| Gain du Straight Mode | Courbe `DRSAccelerationSpeedCurce` (réduite à 0,75 dans le pak), `DRSTopSpeedMultiplier` | 🔧 remettre 1,0 au moins : en 2026 l'ouverture est plus large (avant + arrière) |
-| **Overtake Mode** (< 1 s → +0,5 MJ au tour suivant) | Code ajouté à la place du test d'1 s : à moins d'1 s, +12,5 % de batterie (objet voiture +0x878, 0..1), une fois par tour | 🧪 codé, à tester en course |
-| Case OVERTAKE du bandeau | S'allume pour tout le monde depuis le patch | 🔧 la relier au vrai Overtake Mode (DLL → fichier lu par le Lua → interface) |
-| 350 kW, 50 % électrique | Pak : `ERSAccelDeployBatteryRate` −0,10, `ERSAccelerationMultiplier_Inactive` 0,55 | ✅ cohérent : −0,10/s vide la batterie en ~10 s, et 4 MJ à 350 kW durent 11,4 s |
+| Straight Mode pour tous, sans écart | `Reg2026Patch.dll` : le test « > 1 s » au point de détection est contourné | ✅ mesuré à Monza (toute la grille au niveau « avec DRS ») |
+| Dès le 1er tour | `Reg2026Patch.dll` : condition de tour neutralisée (exe+0x230C335, objet voiture +0x870) | ✅ vu en course (DRS et bonus dès le tour 1) |
+| Zones Straight Mode désignées | Zones du jeu + zones ajoutées, au nombre annoncé par la FIA quand il est connu (ZONES_2026.md) | ✅ sauf Australie (4/5 : pas d'autre ligne droite) et Monaco (zone du jeu gardée) |
+| Sous voiture de sécurité (si sec) | Le jeu bloque | ➖ blocage gardé : aucun effet utile à vitesse de safety car |
+| Pluie : mode partiel | Le jeu bloque sur piste mouillée | ➖ approximation |
+| Gain du Straight Mode (avant + arrière, traînée −55 %) | Pak : courbe DRS d'origine, `DRSTopSpeedMultiplier` 1,03–1,06 (1,016–1,043), `DRSAccelerationMultiplier` 1,05–1,20 (1,0–1,146) | 🧪 à valider par des temps au tour |
+| **Overtake Mode** (< 1 s → +0,5 MJ) | `Reg2026Patch.dll` : à moins d'1 s, +12,5 % de batterie (objet voiture +0x878), une fois par tour | ✅ vu en course (patch.log) |
+| Case OVERTAKE du bandeau | Interface : saut de batterie d'au moins 8 points → allumée jusqu'à la fin du tour (20 s minimum) | 🧪 à voir en course |
+| 350 kW, 50 % électrique | Pak : `ERSAccelDeployBatteryRate` −0,10, `ERSAccelerationMultiplier_Inactive` 0,55 | ✅ cohérent : batterie vide en ~10 s, 4 MJ à 350 kW durent 11,4 s |
 | 8,5 MJ récupérés par tour | Pak : `ERSBrakingChargeBatteryRate` 0,12 | ✅ ordre de grandeur correct (~2 batteries par tour) |
-| Puissance électrique réduite au-delà de 290 km/h | Aucun équivalent direct (le jeu applique un multiplicateur d'accélération) | 🔍 à étudier : courbe d'accélération ERS selon la vitesse, si elle existe |
-| Appui −30 %, traînée −55 % | CarStats : `AeroSpeedMultipliers`, `TopSpeed`, `Acceleration` | 🔧 vitesse en virage plus basse, vitesse de pointe plus haute |
-| 770 kg, pneus étroits | CarStats `MassWeight`, données pneus | 🔍 à étudier (moins d'adhérence, usure) |
-| Moins d'air sale (90 % d'appui à 20 m) | Pak : `DirtyAirMaxDist` 150 (220 avant) | ✅ fait ; `DirtyAirSpeedMultipliers` à ajuster |
-| Boost manuel | Modes ERS du jeu (déploiement) | ✅ existe déjà dans le jeu |
+| Puissance électrique réduite au-delà de 290 km/h | Pas d'équivalent dans le jeu (multiplicateur d'accélération) | ➖ non reproduit |
+| Appui −30 % (−30 kg) | Pak : `AeroSpeedMultipliers` virages lents −2 %, moyens −5 %, rapides −8 % | 🧪 à valider par des temps au tour |
+| Moins d'air sale (90 % d'appui à 20 m) | Pak : `DirtyAirMaxDist` 150 (220), `DirtyAirSpeedMultipliers` 0,93 (0,90) | ✅ |
+| Boost manuel | Modes ERS du jeu | ✅ existe déjà |
 
-## 4. Ordre proposé
+## 4. Reste à faire
 
-1. **Straight Mode dès le 1er tour** : patch de la condition de tour dans exe+0x230C2B0. Petit, même méthode que le patch actuel.
-2. **Overtake Mode réel** : petit bout de code natif à la place du test d'1 s. À moins d'1 s, la voiture garde son DRS normal et reçoit en plus +12,5 % de batterie. Il faut d'abord trouver le champ de charge ERS dans l'objet voiture (même méthode qu'avec +0x86D).
-3. **Case OVERTAKE** branchée sur l'étape 2.
-4. **Aéro 2026** : gain du Straight Mode à 1,0 ou plus, appui en virage −30 % dans CarStats. À valider par des mesures de temps au tour.
-5. **Zones FIA officielles** circuit par circuit.
+- Valider l'aéro par des temps au tour (pak actuel contre `build/backup_pak_v1`) et ajuster.
+- Monaco sans zone : retirer la zone du jeu demande de toucher aux points de détection (risque de drapeau rouge).
