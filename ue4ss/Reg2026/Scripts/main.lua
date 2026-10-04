@@ -63,6 +63,96 @@ local function logOnce(msg)
 end
 
 ---------------------------------------------------------------------------
+-- Valeurs 2026 écrites en mémoire dans les data assets chargés
+---------------------------------------------------------------------------
+-- Le pak zzz_Reg2026_P ne gagne pas toujours : un autre mod qui contient les mêmes assets (RRacingV5 par
+-- exemple) peut passer devant, et nos valeurs ne sont alors jamais lues. On les écrit donc aussi directement
+-- dans les objets chargés, champ par champ : les autres réglages de l'autre mod restent en place.
+-- Mêmes valeurs que scripts/patch_2026.py.
+local VALUES = {
+    { "/Game/RaceSim/RaceSimDataAsset.RaceSimDataAsset", {
+        { "ERSAccelDeployBatteryRate", -0.10 },
+        { "ERSBrakingChargeBatteryRate", 0.12 },
+        { "ERSAccelerationMultiplier_Inactive", 0.66 },
+        { "ERSWearRate", 15.0 },
+        { "SlipstreamAccelerationMultiplier", 1.10 },
+        { "DirtyAirMaxDist", 150.0 },
+        { "OvertakeData.OvertakeAssistOvertakeDifficultyModifier", 0.25 },
+        { "OvertakeData.SlipstreamTimeToOvertake", 1.5 },
+        { "OvertakeData.OvertakeMaxStartDistance", 50.0 },
+    } },
+    { "/Game/RaceSim/DriverTacticsDataAsset.DriverTacticsDataAsset", {
+        { "ERSDeployBudget", 0.50 },
+    } },
+    { "/Game/SharedAssets/DataAssets/CarStatsDataAsset.CarStatsDataAsset", {
+        { "CarStatWeights.TopSpeedWeights.PowerWeight", 0.15 },
+        { "CarStatWeights.TopSpeedWeights.DragReductionWeight", 0.85 },
+        { "CarStatWeights.AccelerationWeights.PowerWeight", 0.6 },
+        { "CarStatWeights.AccelerationWeights.DragReductionWeight", 0.4 },
+        { "CarStatRanges.AeroSpeedMultipliers[1]", { 0.814, 0.945 } },
+        { "CarStatRanges.AeroSpeedMultipliers[2]", { 0.731, 0.95 } },
+        { "CarStatRanges.AeroSpeedMultipliers[3]", { 0.767, 0.92 } },
+        { "CarStatRanges.DirtyAirSpeedMultipliers[1]", { 0.93, 1.0 } },
+        { "CarStatRanges.DirtyAirSpeedMultipliers[2]", { 0.93, 1.0 } },
+        { "CarStatRanges.DirtyAirSpeedMultipliers[3]", { 0.93, 1.0 } },
+        { "CarStatRanges.DRSTopSpeedMultiplier", { 1.03, 1.06 } },
+        { "CarStatRanges.DRSAccelerationMultiplier", { 1.05, 1.20 } },
+    } },
+}
+
+--- renvoie le conteneur et la clé finale d'un chemin « A.B[2].C »
+local function resolve(obj, path)
+    local parts = {}
+    for p in path:gmatch("[^%.]+") do parts[#parts + 1] = p end
+    local cur = obj
+    for i = 1, #parts - 1 do
+        local name, idx = parts[i]:match("^(.-)%[(%d+)%]$")
+        if name then cur = cur[name][tonumber(idx)] else cur = cur[parts[i]] end
+    end
+    local last = parts[#parts]
+    local name, idx = last:match("^(.-)%[(%d+)%]$")
+    if name then return cur[name], tonumber(idx) end
+    return cur, last
+end
+
+local valuesState = {}  -- chemin d'asset -> "ok" / "absent"
+local function close(a, b) return math.abs((a or 0) - b) < 1e-4 end
+
+local function applyValues()
+    for _, entry in ipairs(VALUES) do
+        local path, fields = entry[1], entry[2]
+        local obj = StaticFindObject(path)
+        if obj and obj:IsValid() then
+            local done, total, errors = 0, #fields, {}
+            for _, f in ipairs(fields) do
+                local ok, err = pcall(function()
+                    local holder, key = resolve(obj, f[1])
+                    if type(f[2]) == "table" then
+                        local v = holder[key]
+                        v.X = f[2][1]; v.Y = f[2][2]
+                        local back = holder[key]
+                        if not (close(back.X, f[2][1]) and close(back.Y, f[2][2])) then error("relu " .. tostring(back.X)) end
+                    else
+                        holder[key] = f[2]
+                        if not close(holder[key], f[2]) then error("relu " .. tostring(holder[key])) end
+                    end
+                end)
+                if ok then done = done + 1 else errors[#errors + 1] = f[1] .. " (" .. tostring(err) .. ")" end
+            end
+            local state = done .. "/" .. total
+            if valuesState[path] ~= state then
+                valuesState[path] = state
+                log(string.format("valeurs 2026 : %s %d/%d", path:match("[^/]+$"), done, total))
+                for _, e in ipairs(errors) do log("  impossible : " .. e) end
+            end
+        elseif valuesState[path] ~= "absent" then
+            valuesState[path] = "absent"
+            log("valeurs 2026 : " .. path .. " pas encore chargé")
+        end
+    end
+end
+
+---------------------------------------------------------------------------
 -- Zones
 ---------------------------------------------------------------------------
 
@@ -326,6 +416,8 @@ local function tryHook()
                 lastTrackCheck = now
                 local ok, err = pcall(patchTrack)
                 if not ok then logOnce("erreur circuit : " .. tostring(err)) end
+                local okv, errv = pcall(applyValues)
+                if not okv then logOnce("erreur valeurs 2026 : " .. tostring(errv)) end
             end
 
             local ok, err = pcall(updateCar, car)
@@ -343,3 +435,13 @@ end
 
 loadPatch()
 tryHook()
+
+-- valeurs 2026 : dès que les data assets sont chargés, avant la première course, puis toutes les 5 s
+-- (un rechargement d'asset remettrait les valeurs de l'autre mod)
+LoopAsync(5000, function()
+    ExecuteInGameThread(function()
+        local ok, err = pcall(applyValues)
+        if not ok then logOnce("erreur valeurs 2026 : " .. tostring(err)) end
+    end)
+    return false
+end)
