@@ -43,7 +43,7 @@ Télécharger la dernière [release](https://github.com/AndyD9/F1Manager24-REG26
 
 ## Installation depuis les sources
 
-1. Compiler la DLL (`tools_nativeuild.bat`, Visual Studio 2022), puis copier `ue4ss/Reg2026` dans
+1. Compiler la DLL (`tools_native/build.bat`, Visual Studio 2022), puis copier `ue4ss/Reg2026` dans
    `F1Manager24/Binaries/Win64/ue4ss/Mods/` (avec `enabled.txt` et `Reg2026Patch.dll`).
 2. Construire et installer le pak d'interface :
    ```
