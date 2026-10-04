@@ -3,16 +3,17 @@
 -- 1. Zones : au chargement d'un circuit, ajoute les zones Straight Mode (zones.lua) aux zones DRS du jeu
 --    (début et fin seulement : un point de détection ajouté provoque un drapeau rouge). Le jeu enchaîne
 --    sur une zone ajoutée quand aucun point de détection ne la précède.
--- 2. Straight Mode réel : Reg2026Patch.dll (tools_native/reg2026patch.cpp) retire du jeu la règle
---    « moins d'1 s » au point de détection. Toute la grille a alors le DRS dans les zones, ouvert par le jeu
---    lui-même avec son vrai gain de vitesse ; les blocages du jeu restent (premiers tours, voiture de
---    sécurité, drapeaux, pluie). Le DRS mod et le bandeau des pilotes suivent l'état du jeu.
+-- 2. Règlement 2026 dans la simulation : Reg2026Patch.dll (tools_native/reg2026patch.cpp).
+--    Straight Mode : toute la grille a le DRS dans les zones dès le 1er tour, ouvert par le jeu lui-même
+--    avec son vrai gain de vitesse (blocages restants : voiture de sécurité, drapeaux, pluie).
+--    Overtake Mode : à moins d'1 s au point de détection, +12,5 % de batterie ERS (0,5 MJ sur 4 MJ),
+--    une fois par tour. Le DRS mod et le bandeau des pilotes suivent l'état du jeu.
 -- 3. Mesure : à la sortie de chaque zone, une ligne dans Mods/Reg2026/mesures.csv (vitesses d'entrée et max,
 --    Straight Mode actif ou non, état DRS le plus haut avant / dans la zone, « jeu » si le DRS a été ouvert).
 -- 4. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
 --    ici seulement un message temporaire au changement de mode.
 --
--- Touche : F7 Straight Mode pour toute la grille / règle d'origine du jeu (DRS à moins d'1 s).
+-- Touche : F7 règlement 2026 / règle d'origine du jeu (DRS à moins d'1 s).
 local UEHelpers = require("UEHelpers")
 local ZONES = require("zones")
 
@@ -266,7 +267,7 @@ RegisterKeyBind(Key.F7, {}, function()
         if f then f:write("Straight Mode coupé (F7)"); f:close() end
     end
     log("Straight Mode : " .. (straightOn and "toute la grille" or "règle d'origine"))
-    showToast(straightOn and "Straight Mode : DRS pour toute la grille"
+    showToast(straightOn and "Règlement 2026 : Straight Mode pour tous, Overtake Mode à moins d'1 s"
         or "Règle d'origine du jeu : DRS à moins d'1 s",
         straightOn and COLOR_ON or COLOR_WARN)
 end)

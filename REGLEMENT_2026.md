@@ -38,11 +38,11 @@ Sources : [Motor Sport Magazine](https://www.motorsportmagazine.com/articles/sin
 |---|---|---|
 | Straight Mode pour tous, sans écart | Patch : suppression du test « > 1 s » au point de détection | ✅ fait, mesuré à Monza (toute la grille au niveau « avec DRS ») |
 | Zones Straight Mode désignées | Zones DRS du jeu + 26 zones ajoutées (ZONES_2026.md), enchaînées par le jeu | ✅ fait ; à aligner sur les zones FIA officielles circuit par circuit |
-| Dès le 1er tour | Le jeu bloque le DRS les 2 premiers tours et après chaque relance (objet voiture +0x870) | 🔧 à patcher dans la même fonction (condition du tour) |
+| Dès le 1er tour | Patch de la condition de tour (exe+0x230C335, objet voiture +0x870) | 🧪 codé, à tester en course |
 | Sous voiture de sécurité (si sec) | Le jeu bloque | ➖ garder le blocage : aucun effet utile à vitesse de safety car |
 | Pluie : mode partiel | Le jeu bloque complètement sur piste mouillée | ➖ approximation acceptable ; option : autoriser avec un gain réduit |
 | Gain du Straight Mode | Courbe `DRSAccelerationSpeedCurce` (réduite à 0,75 dans le pak), `DRSTopSpeedMultiplier` | 🔧 remettre 1,0 au moins : en 2026 l'ouverture est plus large (avant + arrière) |
-| **Overtake Mode** (< 1 s → +0,5 MJ au tour suivant) | Le résultat du test d'1 s est aujourd'hui jeté par le patch | 🔧 détourner ce test : à moins d'1 s, la DLL **ajoute de l'énergie à la batterie** de la voiture (0,5 MJ / 4 MJ ≈ **+12,5 %** de charge) |
+| **Overtake Mode** (< 1 s → +0,5 MJ au tour suivant) | Code ajouté à la place du test d'1 s : à moins d'1 s, +12,5 % de batterie (objet voiture +0x878, 0..1), une fois par tour | 🧪 codé, à tester en course |
 | Case OVERTAKE du bandeau | S'allume pour tout le monde depuis le patch | 🔧 la relier au vrai Overtake Mode (DLL → fichier lu par le Lua → interface) |
 | 350 kW, 50 % électrique | Pak : `ERSAccelDeployBatteryRate` −0,10, `ERSAccelerationMultiplier_Inactive` 0,55 | ✅ cohérent : −0,10/s vide la batterie en ~10 s, et 4 MJ à 350 kW durent 11,4 s |
 | 8,5 MJ récupérés par tour | Pak : `ERSBrakingChargeBatteryRate` 0,12 | ✅ ordre de grandeur correct (~2 batteries par tour) |
