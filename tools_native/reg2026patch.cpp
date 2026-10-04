@@ -57,10 +57,18 @@
 //    - 1 Récupération -> LIFT & COAST : plus de déploiement au-delà de 250 km/h et recharge au-dessus, même sans
 //      super clipping.
 //
+// 6. Tableaux aéro 2026 du CarStatsDataAsset : AeroSpeedMultipliers et DirtyAirSpeedMultipliers (3 FVector2D en
+//    doubles chacun). UE4SS ne sait pas indexer ces tableaux fixes et le pak zzz_Reg2026_P perd face à un mod qui
+//    remplace le même asset (RRacingV5). Le script Lua écrit l'adresse de l'objet dans carstats.txt une fois ses
+//    propres valeurs en place, et la DLL écrit les tableaux. Mesuré à Monza : DRSTopSpeedMultiplier en +0x80
+//    (1,03 / 1,06 écrits par le script : sert de vérification), AeroSpeedMultipliers en +0x1C0,
+//    DirtyAirSpeedMultipliers en +0x200.
+//
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <initializer_list>
 #include <stddef.h>
 
@@ -97,6 +105,11 @@ static const DWORD CAR_STRIDE = 0x10D8;
 static const int GRID = 22;
 static const int CARS = 32;
 static const DWORD CAR_BATTERY = 0x878;
+static const DWORD STATS_DRS_TOP = 0x80;   // CarStatsDataAsset : CarStatRanges.DRSTopSpeedMultiplier (2 doubles)
+static const DWORD STATS_AERO = 0x1C0;     // CarStatRanges.AeroSpeedMultipliers[3] (FVector2D en doubles)
+static const DWORD STATS_DIRTY = 0x200;    // CarStatRanges.DirtyAirSpeedMultipliers[3]
+static const double AERO_2026[6] = { 0.814, 0.945, 0.731, 0.95, 0.767, 0.92 };  // mêmes valeurs que scripts/patch_2026.py
+static const double DIRTY_2026[6] = { 0.93, 1.0, 0.93, 1.0, 0.93, 1.0 };
 static const float OVERTAKE_ENERGY = 0.125f;
 static const DWORD POLL_MS = 100;
 static const int RING = 64;
@@ -194,6 +207,47 @@ static bool Readable(const void* p, size_t n) {
     return VirtualQuery(p, &mbi, sizeof(mbi)) && mbi.State == MEM_COMMIT &&
            (BYTE*)p + n <= (BYTE*)mbi.BaseAddress + mbi.RegionSize &&
            (mbi.Protect & (PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY | PAGE_READWRITE));
+}
+
+/// tableaux aéro 2026 dans le CarStatsDataAsset dont le script Lua a noté l'adresse (carstats.txt)
+static void ApplyAeroTables() {
+    static DWORD64 logged = 0;  // dernier objet signalé, pour ne pas répéter le journal
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, L"%s\\carstats.txt", g_dir);
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path, L"r") != 0 || !f) return;
+    DWORD64 addr = 0;
+    fscanf_s(f, "%llx", &addr);
+    fclose(f);
+    if (!addr) return;
+    BYTE* obj = (BYTE*)addr;
+    bool ok = Readable(obj + STATS_DRS_TOP, 16) && Readable(obj + STATS_AERO, 48) && Readable(obj + STATS_DIRTY, 48);
+    double* aero = (double*)(obj + STATS_AERO);
+    double* dirty = (double*)(obj + STATS_DIRTY);
+    if (ok) {
+        const double* drs = (const double*)(obj + STATS_DRS_TOP);
+        ok = fabs(drs[0] - 1.03) < 1e-6 && fabs(drs[1] - 1.06) < 1e-6;
+        for (int i = 0; ok && i < 6; i++) ok = aero[i] > 0.5 && aero[i] < 1.5 && dirty[i] > 0.5 && dirty[i] < 1.5;
+    }
+    if (!ok) {
+        if (logged != addr) Log("tableaux aéro : CarStatsDataAsset inattendu (objet %llX), rien n'est écrit", addr);
+        logged = addr;
+        return;
+    }
+    bool same = true;
+    for (int i = 0; i < 6; i++) same = same && aero[i] == AERO_2026[i] && dirty[i] == DIRTY_2026[i];
+    if (same) {
+        if (logged != addr) Log("tableaux aéro 2026 déjà en place (objet %llX)", addr);
+        logged = addr;
+        return;
+    }
+    Log("tableaux aéro 2026 écrits (objet %llX) : aéro %.3f/%.3f %.3f/%.3f %.3f/%.3f, air sale %.2f/%.2f -> 2026",
+        addr, aero[0], aero[1], aero[2], aero[3], aero[4], aero[5], dirty[0], dirty[1]);
+    for (int i = 0; i < 6; i++) {
+        *(volatile double*)(aero + i) = AERO_2026[i];
+        *(volatile double*)(dirty + i) = DIRTY_2026[i];
+    }
+    logged = addr;
 }
 
 /// écrit du code du jeu ; une écriture de 2 octets alignés est atomique pour les threads qui l'exécutent
@@ -504,6 +558,7 @@ static DWORD WINAPI Worker(LPVOID) {
         if (tick++ % 10 == 0) {
             if (applied == 1) ReadClipConfig();
             else g_cfg.clipOn = 0;
+            ApplyAeroTables();
         }
         Sleep(POLL_MS);
     }

@@ -28,6 +28,7 @@ local MOD_DIR = "ue4ss/Mods/Reg2026/"
 local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
 local CSV_FILE = MOD_DIR .. "mesures.csv"
 local CLIP_FILE = MOD_DIR .. "superclipping.ini"  -- lu par Reg2026Patch.dll
+local CARSTATS_FILE = MOD_DIR .. "carstats.txt"    -- adresse du CarStatsDataAsset, lu par Reg2026Patch.dll
 local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.0007\n"
 
 -- EDRSState
@@ -90,7 +91,8 @@ local VALUES = {
         { "CarStatWeights.AccelerationWeights.PowerWeight", 0.6 },
         { "CarStatWeights.AccelerationWeights.DragReductionWeight", 0.4 },
         -- AeroSpeedMultipliers et DirtyAirSpeedMultipliers (tableaux fixes de 3 FVector2D) : UE4SS ne sait pas
-        -- les indexer, seul le pak les apporte.
+        -- les indexer. L'adresse de l'objet est écrite dans carstats.txt et Reg2026Patch.dll les écrit
+        -- (mesuré à Monza : +0x1C0 et +0x200 dans l'objet).
         { "CarStatRanges.DRSTopSpeedMultiplier", { 1.03, 1.06 } },
         { "CarStatRanges.DRSAccelerationMultiplier", { 1.05, 1.20 } },
     } },
@@ -112,6 +114,7 @@ local function resolve(obj, path)
 end
 
 local valuesState = {}  -- chemin d'asset -> "ok" / "absent"
+local carStatsAddr = nil
 local function close(a, b) return math.abs((a or 0) - b) < 1e-4 end
 
 local function applyValues()
@@ -136,6 +139,11 @@ local function applyValues()
                 if ok then done = done + 1 else errors[#errors + 1] = f[1] .. " (" .. tostring(err) .. ")" end
             end
             local state = done .. "/" .. total
+            if path:find("CarStatsDataAsset") and done == total and obj:GetAddress() ~= carStatsAddr then
+                carStatsAddr = obj:GetAddress()
+                local f = io.open(CARSTATS_FILE, "w")
+                if f then f:write(string.format("%X\n", carStatsAddr)); f:close() end
+            end
             if valuesState[path] ~= state then
                 valuesState[path] = state
                 log(string.format("valeurs 2026 : %s %d/%d (objet %X)", path:match("[^/]+$"), done, total, obj:GetAddress()))
@@ -432,12 +440,7 @@ end
 loadPatch()
 tryHook()
 
--- valeurs 2026 : dès que les data assets sont chargés, avant la première course, puis toutes les 5 s
--- (un rechargement d'asset remettrait les valeurs de l'autre mod)
-LoopAsync(5000, function()
-    ExecuteInGameThread(function()
-        local ok, err = pcall(applyValues)
-        if not ok then logOnce("erreur valeurs 2026 : " .. tostring(err)) end
-    end)
-    return false
-end)
+-- Les valeurs 2026 sont appliquées depuis le crochet (toutes les 2 s, dès que des voitures existent : avant le
+-- départ, et de nouveau si un asset est rechargé). Pas de LoopAsync + ExecuteInGameThread répétés : le jeu a
+-- planté le 2026-10-04 sur une erreur Lua d'UE4SS sans pile (« attempt to call a RemoteUnrealParam value »,
+-- qui fait abandonner le jeu) et ces rappels asynchrones répétés en sont le suspect le plus probable.

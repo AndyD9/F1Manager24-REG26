@@ -30,11 +30,14 @@ Cette page concerne le code source.
 
 ## Release
 
-Un seul zip qui reprend l'arborescence du jeu, à décompresser dans le dossier du jeu :
+Deux zips qui reprennent l'arborescence du jeu, à décompresser dans le dossier du jeu, construits par
+`scripts/build_release.ps1 X.Y.Z` (depuis `build/out` et `ue4ss/Reg2026`) dans `build/release/` :
+`Reg2026_vX.Y.Z.zip` et `Reg2026_vX.Y.Z_superclipping.zip`, dont la seule différence est `actif=0` / `actif=1`
+dans `superclipping.ini`.
 
 ```
 F1Manager24/Content/Paks/                      zzz_Reg2026_P.pak/.ucas/.utoc, zzz_Reg2026UI_P.pak
-F1Manager24/Binaries/Win64/ue4ss/Mods/Reg2026/ enabled.txt, Reg2026Patch.dll, Scripts/
+F1Manager24/Binaries/Win64/ue4ss/Mods/Reg2026/ enabled.txt, Reg2026Patch.dll, superclipping.ini, Scripts/
 ```
 
 Ne jamais publier la clé AES ni les fichiers extraits du jeu (`extract/`, `build/`).

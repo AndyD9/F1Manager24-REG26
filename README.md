@@ -15,11 +15,32 @@ Les changements agissent sur la simulation elle-même, pas seulement sur l'affic
 | **Overtake Mode** | À moins d'1 s de la voiture devant : 0,5 MJ d'énergie en plus | +12,5 % de batterie, que la voiture dépense aussitôt à pleine puissance électrique |
 | **ERS** | 350 kW, environ 50 % de la puissance | Plus de puissance électrique, batterie vide en ~10 s de déploiement, recharge plus forte |
 | **Aéro** | Appui −30 %, voitures plus légères | Un peu moins de vitesse en virage (surtout les rapides), moins d'air sale derrière une voiture |
+| **Gestion de l'énergie** | Boost manuel, récupération au lever de pied, « clipping » en bout de ligne droite | Les quatre stratégies ERS deviennent **Boost**, **Équilibré**, **Réserve** et **Lift & Coast** (voir plus bas) |
 
 Dans le bandeau de chaque pilote, la case DRS est remplacée par deux cases :
 
 - **STRAIGHT** (vert) : l'aileron est ouvert.
 - **OVERTAKE** (couleur ERS) : le pilote a passé la ligne à moins d'1 s de la voiture devant.
+
+Au-dessus du nom du pilote, une ligne affiche la **vitesse**, la **batterie** et l'état de l'**ERS** (déploie, recharge, neutre).
+
+### Stratégies ERS
+
+Dans l'écran Stratégies ERS, les quatre réglages du jeu sont renommés et deux d'entre eux changent de comportement :
+
+| Stratégie 2026 | Réglage d'origine | Comportement |
+|---|---|---|
+| **Boost** | Déploiement | Celui du jeu : c'est la stratégie de course de l'IA. |
+| **Équilibré** | Neutre | Celui du jeu. |
+| **Réserve** | Top-Up | Le pilote garde son énergie : pas de déploiement, sauf en Overtake Mode ou pour défendre quand une voiture est à moins d'1 s derrière. |
+| **Lift & Coast** | Récupération | Plus d'électrique au-delà de 250 km/h et recharge au-dessus : la batterie se remplit en bout de ligne droite. |
+
+### Super clipping (optionnel)
+
+En 2026, la puissance électrique est réduite à haute vitesse et la batterie se recharge en bout de ligne droite. Le zip
+`Reg2026_vX.Y.Z_superclipping.zip` active cette règle pour toute la grille : plus de déploiement au-delà de 290 km/h
+(337 km/h en Overtake Mode) et recharge au-dessus. Les courses sont plus serrées en ligne droite, mais l'IA ne le prévoit
+pas dans sa gestion de batterie. **F6** en jeu l'active ou le coupe à tout moment.
 
 Le détail du règlement et de chaque réglage est dans [REGLEMENT_2026.md](REGLEMENT_2026.md).
 
@@ -37,7 +58,8 @@ Le détail du règlement et de chaque réglage est dans [REGLEMENT_2026.md](REGL
 ## Installation
 
 1. Ouvre le dossier du jeu : dans Steam, clic droit sur **F1 Manager 2024** → **Gérer** → **Parcourir les fichiers locaux**.
-2. Télécharge `Reg2026_vX.Y.Z.zip` depuis la [dernière version](https://github.com/AndyD9/F1Manager24-REG26/releases/latest).
+2. Télécharge `Reg2026_vX.Y.Z.zip` depuis la [dernière version](https://github.com/AndyD9/F1Manager24-REG26/releases/latest)
+   (ou `Reg2026_vX.Y.Z_superclipping.zip` : même mod, avec le super clipping activé d'avance).
 3. Décompresse-le **dans ce dossier** (celui qui contient `F1Manager24`) et accepte de fusionner les dossiers.
 
 C'est tout. Le zip contient déjà la bonne arborescence :
@@ -57,6 +79,8 @@ F1Manager24\Binaries\Win64\ue4ss\Mods\Reg2026\  le mod (scripts et Reg2026Patch.
 
 - **F7** : passe du règlement 2026 à la règle d'origine du jeu (DRS à moins d'1 s, après 2 tours), et inversement.
   Un message s'affiche à l'écran. Les valeurs ERS et aéro restent celles de 2026.
+- **F6** : active ou coupe le super clipping (voir plus haut). Le réglage est gardé d'une partie à l'autre
+  (`Mods\Reg2026\superclipping.ini`).
 
 ## Mise à jour
 
@@ -79,7 +103,8 @@ Le mod ne modifie ni les fichiers d'origine du jeu ni tes sauvegardes : une fois
 | Pas de cases STRAIGHT / OVERTAKE | Vérifie que `zzz_Reg2026UI_P.pak` est bien dans `Content\Paks`. Un autre mod qui modifie le bandeau des pilotes peut entrer en conflit. |
 | `patch.log` dit « ce n'est pas F1 Manager 2024 v1.11 » ou « octets inattendus » | Ta version du jeu n'est pas la 1.11 : la partie Straight Mode / Overtake ne s'active pas, par sécurité. |
 | Rien ne se passe du tout | UE4SS n'est pas installé ou pas dans le bon dossier (voir plus haut). |
-| Conflit avec un autre mod | Les mods qui modifient les données de course (ERS, aéro, dépassements) ou l'interface du bandeau pilote peuvent se gêner. |
+| Un autre mod change les mêmes données de course | Les mods qui remplacent les fichiers de données de course (par exemple **RRacingV5**) passent devant le pak du mod, et ses valeurs ERS / aéro ne sont alors jamais lues. Le mod les réécrit en mémoire au chargement de chaque course (`patch.log` : « valeurs 2026 » dans `ue4ss\UE4SS.log`, « tableaux aéro 2026 » dans `patch.log`), mais le reste des réglages de l'autre mod s'applique aussi : le résultat est un mélange des deux. Pour le règlement 2026 tel qu'il a été réglé, désactive l'autre mod. |
+| Un autre mod change le bandeau des pilotes | Les deux interfaces se gênent : garde l'un ou l'autre. |
 
 ## À savoir
 

@@ -41,7 +41,7 @@ Exemple Bahreïn (3 zones) :
 | `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,12** | Récupération environ doublée (8,5 MJ/tour) |
 | `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,66** | Sans ERS, on perd un peu plus de puissance (0,55 et 0,62 écartaient trop le peloton) |
 | `RaceSimDataAsset` | `ERSWearRate` | 13 | 15 | Plus sollicité |
-| `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | **0,80** | Les pilotes utilisent plus l'électrique |
+| `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | **0,80** | Voulu : les pilotes utilisent plus l'électrique. Mesuré à Monza (2026-10-04, tours 3 et suivants) : aucun effet visible, 15 % du temps en déploiement et batterie moyenne 87 % avec 0,50 comme avec 0,80 ; ce n'est pas ce réglage qui limite le déploiement de l'IA |
 | `AI/RaceSimAIDataAsset` | `ERSChargingModeToggleThreshold` | 0,5 / 0,25 | 0,5 / 0,25 (inchangé) | 0,6 / 0,35 laissait l'IA en recharge trop longtemps, donc lente |
 
 ## 3. Overtake Mode
