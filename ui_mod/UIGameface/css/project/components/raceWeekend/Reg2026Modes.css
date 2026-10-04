@@ -31,18 +31,19 @@
 }
 
 /* Bandeau vitesse / batterie / ERS, juste au-dessus du nom du pilote, sur toute la largeur du bandeau.
-   Positionné par rapport à DriverPanelTopBar_content (position: relative). */
+   Positionné par rapport à DriverPanelTopBar_content (position: relative). Le moteur d'interface n'étire pas
+   un élément entre left et right : largeur explicite, et largeur fixe pour chaque case. */
 .Reg2026Telemetry_root {
   position: absolute;
   left: 0;
-  right: 0;
   bottom: 100%;
+  width: 100%;
   height: 1.7777777778rem;
   margin-bottom: 0.2222222222rem;
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 0 0.4444444444rem;
+  justify-content: space-between;
   background-color: rgba(var(--interactive-triplet), 0.9);
   border-top-left-radius: 0.1111111111rem;
   border-top-right-radius: 0.1111111111rem;
@@ -57,10 +58,20 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  flex: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.Reg2026Telemetry_cell.speed {
+  width: 28%;
+  margin-left: 0.4444444444rem;
+}
+.Reg2026Telemetry_cell.battery {
+  width: 34%;
 }
 .Reg2026Telemetry_cell.ers {
+  width: 34%;
   justify-content: flex-end;
+  margin-right: 0.4444444444rem;
 }
 .Reg2026Telemetry_value {
   font-family: F1Font;
@@ -76,6 +87,7 @@
 }
 .Reg2026Telemetry_bar {
   position: relative;
+  flex-shrink: 0;
   width: 3.3333333333rem;
   height: 0.5555555556rem;
   margin-right: 0.3333333333rem;
