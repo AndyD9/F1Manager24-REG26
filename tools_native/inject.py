@@ -42,14 +42,17 @@ def find_pid():
     snap = k32.CreateToolhelp32Snapshot(2, 0)
     e = PROCESSENTRY32W()
     e.dwSize = ctypes.sizeof(e)
+    # le jeu tourne en deux processus du même nom (petit lanceur + jeu) : on garde celui qui a le plus de threads
+    best = None
     ok = k32.Process32FirstW(snap, ctypes.byref(e))
     while ok:
-        if e.szExeFile.lower() == EXE.lower():
-            k32.CloseHandle(snap)
-            return e.th32ProcessID
+        if e.szExeFile.lower() == EXE.lower() and (best is None or e.cntThreads > best[1]):
+            best = (e.th32ProcessID, e.cntThreads)
         ok = k32.Process32NextW(snap, ctypes.byref(e))
     k32.CloseHandle(snap)
-    sys.exit(f"{EXE} n'est pas lancé")
+    if not best:
+        sys.exit(f"{EXE} n'est pas lancé")
+    return best[0]
 
 
 def inject():
@@ -123,21 +126,34 @@ def find():
     import struct
     rows = [l.split(";") for l in DEBUG_CARS.read_text(encoding="utf-8").splitlines()[1:] if l.strip()]
     h = k32.OpenProcess(0x0410, False, find_pid())  # VM_READ | QUERY_INFORMATION
-    common = None
     cars = []
     for r in rows:
-        code, addr = r[0], int(r[1], 16)
-        num, pos, lap = int(r[2]), int(r[3]), int(r[4])
+        code, addr, num = r[0], int(r[1], 16), int(r[2])
+        if num == 0:
+            continue  # voitures modèles (« DRV »), hors course
         mem = read_mem(h, addr, ACTOR_SCAN)
         if not mem:
             print(f"{code} : lecture impossible")
             continue
-        # RacePos puis LapCount, deux int32 consécutifs (ordre de FCarData)
-        offs = {o for o in range(0, len(mem) - 8, 4) if struct.unpack_from("<ii", mem, o) == (pos, lap)}
-        common = offs if common is None else common & offs
         cars.append((code, addr, mem, num))
+    # les valeurs bougent pendant la course : on cherche un décalage commun où
+    #  - DriverNumber (stable) est à sa place,
+    #  - l'int32 « RacePos » forme une permutation de 1..N sur toute la grille,
+    #  - l'int32 suivant (LapCount) est quasi identique pour tous.
+    n = len(cars)
+    num_offs = None
+    for code, addr, mem, num in cars:
+        offs = {o for o in range(0, len(mem) - 4, 4) if struct.unpack_from("<i", mem, o)[0] == num}
+        num_offs = offs if num_offs is None else num_offs & offs
+    print(f"{n} voitures, DriverNumber possible à : {[hex(o) for o in sorted(num_offs or [])]}")
+    common = []
+    for o in range(8, ACTOR_SCAN - 8, 4):
+        pos = sorted(struct.unpack_from("<i", c[2], o)[0] for c in cars)
+        laps = [struct.unpack_from("<i", c[2], o + 4)[0] for c in cars]
+        if pos == list(range(1, n + 1)) and max(laps) - min(laps) <= 3 and min(laps) >= 0:
+            common.append(o)
     if not common:
-        sys.exit("décalage introuvable (relancer F11 puis find juste après)")
+        sys.exit("décalage introuvable")
     for o in sorted(common):
         drs = o - 4 - 3  # Gear (int32) juste avant RacePos, DRSState 3 octets avant Gear
         vals = [c[2][drs] for c in cars]
