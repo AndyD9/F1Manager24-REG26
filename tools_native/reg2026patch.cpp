@@ -45,7 +45,8 @@
 //    Ces 19 octets deviennent « mov rax, cave ; jmp rax » + 7 nop (rax n'est plus lu avant d'être réécrit,
 //    et aucun saut ne vise 2308575 ni 2308578). Au-dessus de la vitesse limite, sans freiner (accélération
 //    +0x19C >= 0), la cave ajoute « recharge » à xmm12 (batterie de départ). Mesuré en course à Monza :
-//    plus aucun déploiement au-delà de 290 km/h.
+//    plus aucun déploiement au-delà de 290 km/h ; la fonction est appelée plusieurs fois par pas de simulation
+//    (~1 s) : recharge 0,02 par appel = ~+7 % par pas, d'où 0,005 (~2/3 du coût d'un déploiement).
 //
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
@@ -75,6 +76,7 @@ static const BYTE CLIP_ORIGINAL[19] = { 0x4C, 0x8B, 0xBC, 0x24, 0xE8, 0x00, 0x00
                                         0xF3, 0x0F, 0x59, 0x0D, 0xC4, 0x17, 0xCA, 0x03 };
 
 static const DWORD CAR_LAPS = 0x7E4;
+static const DWORD CAR_DRS_LAP = 0x870;  // tour à partir duquel le jeu d'origine autorise le DRS (départ, relance)
 static const DWORD CAR_MODE = 0x200;   // 2 = en course
 static const DWORD CAR_INDEX = 0x710;
 static const int CARS = 32;
@@ -105,7 +107,7 @@ struct ErsConfig {
     float limitBoost;           // +0x28 m/s
     float harvest;              // +0x2C batterie par appel
 };
-static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.02f };
+static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.005f };
 #define g_boost g_cfg.boost
 struct Boost { BYTE* car; float stop; int endLap; };
 static Boost g_boostInfo[CARS];
@@ -126,7 +128,7 @@ static void Log(const char* fmt, ...) {
     fclose(f);
 }
 
-/// superclipping.ini : actif=0/1, vitesse_max=290, vitesse_max_overtake=337 (km/h), recharge=0.02
+/// superclipping.ini : actif=0/1, vitesse_max=290, vitesse_max_overtake=337 (km/h), recharge=0.005
 static void ReadClipConfig() {
     wchar_t path[MAX_PATH];
     swprintf_s(path, L"%s\\superclipping.ini", g_dir);
@@ -137,7 +139,7 @@ static void ReadClipConfig() {
         return;
     }
     int on = 0;
-    float limit = 290.0f, limitBoost = 337.0f, harvest = 0.02f;
+    float limit = 290.0f, limitBoost = 337.0f, harvest = 0.005f;
     char line[128];
     while (fgets(line, sizeof(line), f)) {
         sscanf_s(line, "actif=%d", &on);
@@ -347,6 +349,9 @@ static void GrantOvertake(LONG& read) {
         BYTE* car = g_ring.cars[read & (RING - 1)];
         if (!Readable(car + CAR_LAPS, 4) || !Readable(car + CAR_BATTERY, 4)) continue;
         int lap = *(int*)(car + CAR_LAPS);
+        // pas d'Overtake Mode dans les 2 tours qui suivent le départ ou une relance : toute la grille
+        // est à moins d'1 s et le déploiement forcé provoquait des accrochages (drapeaux rouges)
+        if (!Readable(car + CAR_DRS_LAP, 4) || lap < *(int*)(car + CAR_DRS_LAP)) continue;
         int slot = -1;
         for (int i = 0; i < RING; i++) {
             if (lastCar[i] == car) { slot = i; break; }
