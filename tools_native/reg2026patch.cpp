@@ -34,6 +34,12 @@
 //    est un saut de Denuvo : on n'y touche pas. Ce crochet est posé une fois au chargement (avant toute
 //    course) et reste en place ; F7 vide seulement la liste des voitures en Overtake.
 //
+// 4. Super clipping (optionnel, superclipping.ini, touche F6 côté Lua). Dans la même cave : au-delà de
+//    vitesse_max (vitesse en m/s en +0x198 de l'objet voiture), plus de déploiement (dl = 1) ; vitesse_max_overtake
+//    pour une voiture en Overtake Mode. Au-dessus, sans freiner (accélération +0x19C >= 0), la batterie se
+//    recharge : on ajoute « recharge » à xmm12, la batterie de départ que le jeu utilise en 230859B pour
+//    calculer la nouvelle valeur (bornée à 1 juste après). Mesuré : un déploiement coûte ~0,03 par appel.
+//
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
 #include <stdio.h>
@@ -78,8 +84,16 @@ static BYTE* g_cave;
 static BYTE g_gapPatch[12];
 static BYTE g_ersPatch[12];
 
-// voitures en Overtake Mode, par index ; lu par la cave ERS
-static volatile BYTE g_boost[CARS];
+// lu par la cave ERS : voitures en Overtake Mode (par index) et réglages du super clipping
+struct ErsConfig {
+    volatile BYTE boost[CARS];  // +0x00
+    volatile LONG clipOn;       // +0x20
+    float limit;                // +0x24 m/s
+    float limitBoost;           // +0x28 m/s
+    float harvest;              // +0x2C batterie par appel
+};
+static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.02f };
+#define g_boost g_cfg.boost
 struct Boost { BYTE* car; float stop; int endLap; };
 static Boost g_boostInfo[CARS];
 
@@ -97,6 +111,39 @@ static void Log(const char* fmt, ...) {
     va_end(args);
     fprintf(f, "\n");
     fclose(f);
+}
+
+/// superclipping.ini : actif=0/1, vitesse_max=290, vitesse_max_overtake=337 (km/h), recharge=0.02
+static void ReadClipConfig() {
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, L"%s\\superclipping.ini", g_dir);
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path, L"r") != 0 || !f) {
+        if (g_cfg.clipOn) Log("super clipping : désactivé (pas de superclipping.ini)");
+        g_cfg.clipOn = 0;
+        return;
+    }
+    int on = 0;
+    float limit = 290.0f, limitBoost = 337.0f, harvest = 0.02f;
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        sscanf_s(line, "actif=%d", &on);
+        sscanf_s(line, "vitesse_max=%f", &limit);
+        sscanf_s(line, "vitesse_max_overtake=%f", &limitBoost);
+        sscanf_s(line, "recharge=%f", &harvest);
+    }
+    fclose(f);
+    bool changed = (on != 0) != (g_cfg.clipOn != 0) || limit / 3.6f != g_cfg.limit ||
+                   limitBoost / 3.6f != g_cfg.limitBoost || harvest != g_cfg.harvest;
+    g_cfg.limit = limit / 3.6f;
+    g_cfg.limitBoost = limitBoost / 3.6f;
+    g_cfg.harvest = harvest;
+    g_cfg.clipOn = on ? 1 : 0;
+    if (changed) {
+        if (on) Log("super clipping : actif, plus de déploiement au-delà de %.0f km/h (%.0f en Overtake Mode), recharge %.3f",
+                    limit, limitBoost, harvest);
+        else Log("super clipping : désactivé");
+    }
 }
 
 static bool StraightOff() {
@@ -160,24 +207,38 @@ static bool BuildCave() {
 
     // cave ERS
     BYTE* ers = p = g_cave + 0x100;
-    put({ 0x0F, 0xB6, 0x45, 0x38 });        // movzx eax, byte [rbp+0x38]
-    put({ 0x84, 0xC0 });                    // test al, al
-    put({ 0x75, 0x00 });                    // jnz done (l'IA recharge)
-    BYTE* jnz = p - 1;
-    put({ 0x40, 0x84, 0xFF });              // test dil, dil
-    put({ 0x74, 0x00 });                    // jz done (ERS indisponible)
-    BYTE* jz = p - 1;
+    auto jcc = [&](BYTE op) { put({ op, 0x00 }); return p - 1; };
+    auto land = [&](BYTE* j) { *j = (BYTE)(p - (j + 1)); };
     put({ 0x51 });                          // push rcx
     put({ 0x0F, 0xB6, 0x8B }); { DWORD d = CAR_INDEX; memcpy(p, &d, 4); p += 4; }  // movzx ecx, byte [rbx+0x710]
     put({ 0x83, 0xE1, CARS - 1 });          // and ecx, CARS-1
-    put({ 0x48, 0xB8 }); put64((DWORD64)g_boost);  // mov rax, g_boost
+    put({ 0x48, 0xB8 }); put64((DWORD64)&g_cfg);  // mov rax, &g_cfg
     put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0
+    BYTE* notBoost = jcc(0x74);             // jz notBoost
+    put({ 0x80, 0x7D, 0x38, 0x00 });        // cmp byte [rbp+0x38], 0 : l'IA recharge ?
+    BYTE* j1 = jcc(0x75);                   // jnz limBoost
+    put({ 0x40, 0x84, 0xFF });              // test dil, dil : ERS disponible ?
+    BYTE* j2 = jcc(0x74);                   // jz limBoost
+    put({ 0x32, 0xD2 });                    // xor dl, dl : déployer (Overtake Mode)
+    land(j1); land(j2);                     // limBoost:
+    put({ 0xF3, 0x0F, 0x10, 0x40, 0x28 });  // movss xmm0, [rax+0x28]
+    BYTE* j3 = jcc(0xEB);                   // jmp clip
+    land(notBoost);
+    put({ 0xF3, 0x0F, 0x10, 0x40, 0x24 });  // movss xmm0, [rax+0x24]
+    land(j3);                               // clip:
+    put({ 0x83, 0x78, 0x20, 0x00 });        // cmp dword [rax+0x20], 0
+    BYTE* j4 = jcc(0x74);                   // jz done
+    put({ 0xF3, 0x0F, 0x10, 0x8B, 0x98, 0x01, 0x00, 0x00 });  // movss xmm1, [rbx+0x198] (vitesse)
+    put({ 0x0F, 0x2F, 0xC8 });              // comiss xmm1, xmm0
+    BYTE* j5 = jcc(0x76);                   // jbe done
+    put({ 0xB2, 0x01 });                    // mov dl, 1 : plus de déploiement
+    put({ 0x0F, 0x57, 0xC0 });              // xorps xmm0, xmm0
+    put({ 0x0F, 0x2F, 0x83, 0x9C, 0x01, 0x00, 0x00 });  // comiss xmm0, [rbx+0x19C] (accélération)
+    BYTE* j6 = jcc(0x77);                   // ja done (freinage : le jeu s'en charge)
+    put({ 0xF3, 0x44, 0x0F, 0x58, 0x60, 0x2C });  // addss xmm12, [rax+0x2C] : recharge
+    land(j4); land(j5); land(j6);           // done:
     put({ 0x59 });                          // pop rcx
-    put({ 0x74, 0x02 });                    // je +2
-    put({ 0x32, 0xD2 });                    // xor dl, dl : déployer
-    put({ 0x31, 0xC0 });                    // xor eax, eax (al valait 0)
-    *jnz = (BYTE)(p - (jnz + 1));           // done:
-    *jz = (BYTE)(p - (jz + 1));
+    put({ 0x0F, 0xB6, 0x45, 0x38 });        // movzx eax, byte [rbp+0x38]
     put({ 0xF3, 0x0F, 0x10, 0x2D });        // movss xmm5, [rip+k]
     BYTE* disp = p; p += 4;
     put({ 0xFF, 0x25, 0, 0, 0, 0 }); put64((DWORD64)(g_exe + ERS_RETURN_RVA));  // jmp [rip] -> 23084CA
@@ -296,6 +357,11 @@ static DWORD WINAPI Worker(LPVOID) {
         }
         if (applied == 1) GrantOvertake(read);
         UpdateBoosts(false);
+        static int tick = 0;
+        if (tick++ % 10 == 0) {
+            if (applied == 1) ReadClipConfig();
+            else g_cfg.clipOn = 0;
+        }
         Sleep(POLL_MS);
     }
 }

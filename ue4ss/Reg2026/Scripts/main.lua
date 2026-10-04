@@ -13,7 +13,9 @@
 -- 4. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
 --    ici seulement un message temporaire au changement de mode.
 --
--- Touche : F7 règlement 2026 / règle d'origine du jeu (DRS à moins d'1 s).
+-- 5. Super clipping (optionnel) : Reg2026Patch.dll lit superclipping.ini (actif=0/1 et seuils) ; F6 le bascule.
+--
+-- Touches : F7 règlement 2026 / règle d'origine du jeu (DRS à moins d'1 s) ; F6 super clipping.
 local UEHelpers = require("UEHelpers")
 local ZONES = require("zones")
 
@@ -25,6 +27,8 @@ local HOOK_RETRY = 250    -- ms : s'enregistrer avant le DRS mod
 local MOD_DIR = "ue4ss/Mods/Reg2026/"
 local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
 local CSV_FILE = MOD_DIR .. "mesures.csv"
+local CLIP_FILE = MOD_DIR .. "superclipping.ini"  -- lu par Reg2026Patch.dll
+local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.02\n"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3
@@ -272,6 +276,31 @@ RegisterKeyBind(Key.F7, {}, function()
         straightOn and COLOR_ON or COLOR_WARN)
 end)
 
+--- bascule actif=0/1 dans superclipping.ini en gardant les autres réglages ; renvoie le nouvel état
+local function toggleClipping()
+    local f = io.open(CLIP_FILE, "r")
+    local text = f and f:read("a") or CLIP_DEFAULT
+    if f then f:close() end
+    local on = text:match("actif%s*=%s*(%d)") == "1"
+    on = not on
+    if text:match("actif%s*=%s*%d") then
+        text = text:gsub("actif%s*=%s*%d", "actif=" .. (on and "1" or "0"), 1)
+    else
+        text = "actif=" .. (on and "1" or "0") .. "\n" .. text
+    end
+    f = io.open(CLIP_FILE, "w")
+    if f then f:write(text); f:close() end
+    return on
+end
+
+RegisterKeyBind(Key.F6, {}, function()
+    local on = toggleClipping()
+    log("super clipping : " .. (on and "actif" or "désactivé"))
+    showToast(on and "Super clipping : plus d'électrique à haute vitesse, recharge en bout de ligne droite"
+        or "Super clipping désactivé",
+        on and COLOR_ON or COLOR_WARN)
+end)
+
 --- charge Reg2026Patch.dll (le travail se fait depuis son DllMain)
 local function loadPatch()
     local dir = debug.getinfo(1, "S").source:match("^@(.*[/\\])Scripts[/\\]")
@@ -309,7 +338,7 @@ local function tryHook()
             end
         end)
     end)
-    if hooked then log("prêt (F7 Straight Mode)") else ExecuteWithDelay(HOOK_RETRY, tryHook) end
+    if hooked then log("prêt (F7 Straight Mode, F6 super clipping)") else ExecuteWithDelay(HOOK_RETRY, tryHook) end
 end
 
 loadPatch()
