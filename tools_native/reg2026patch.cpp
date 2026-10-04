@@ -29,8 +29,9 @@
 //        23084B8  xor dl, dl / jmp / mov dl, 1
 //        23084BE  movzx eax, byte ptr [rbp + 0x38]          ; 0F B6 45 38
 //        23084C2  movss xmm5, dword ptr [rip + 0x3CA6FCA]    ; F3 0F 10 2D CA 6F CA 03
-//    Ces 12 octets deviennent « mov rax, cave ; jmp rax » (rax est écrasé juste après). Quand l'IA ne recharge
-//    pas et que la voiture (index en +0x710) a le bonus, la cave met dl = 0. Le code en 230848F, juste avant,
+//    Ces 12 octets deviennent « mov rax, cave ; jmp rax » (rax est écrasé juste après). Quand la voiture (index
+//    en +0x710) a le bonus et ne freine pas (accélération +0x19C >= 0), la cave met dl = 0 et [rbp+0x38] = 0,
+//    même si l'IA voulait recharger (en Top-Up elle recharge presque toujours). Le code en 230848F, juste avant,
 //    est un saut de Denuvo : on n'y touche pas. Ce crochet est posé une fois au chargement (avant toute
 //    course) et reste en place ; F7 vide seulement la liste des voitures en Overtake.
 //
@@ -263,10 +264,13 @@ static bool BuildCave() {
     put({ 0x80, 0x3C, 0x08, 0x00 });        // cmp byte [rax+rcx], 0 (Overtake Mode)
     BYTE* r4 = jcc(0x74);                   // jz limits
     land(r1); land(r2);                     // attack:
-    put({ 0x80, 0x7D, 0x38, 0x00 });        // cmp byte [rbp+0x38], 0 : l'IA recharge ?
-    BYTE* r5 = jcc(0x75);                   // jnz limits
+    // on déploie même si l'IA voulait recharger (en Top-Up elle recharge presque toujours), mais pas au freinage
     put({ 0x40, 0x84, 0xFF });              // test dil, dil : ERS disponible ?
-    BYTE* r6 = jcc(0x74);                   // jz limits
+    BYTE* r5 = jcc(0x74);                   // jz limits
+    put({ 0x0F, 0x57, 0xC0 });              // xorps xmm0, xmm0
+    put({ 0x0F, 0x2F, 0x83, 0x9C, 0x01, 0x00, 0x00 });  // comiss xmm0, [rbx+0x19C] (accélération)
+    BYTE* r6 = jcc(0x77);                   // ja limits (freinage)
+    put({ 0xC6, 0x45, 0x38, 0x00 });        // mov byte [rbp+0x38], 0 : pas de recharge
     put({ 0x32, 0xD2 });                    // xor dl, dl : déployer
     land(r3); land(r4); land(r5); land(r6); // limits:
     // vitesse au-delà de laquelle on ne déploie plus : LIFT & COAST toujours, sinon super clipping
