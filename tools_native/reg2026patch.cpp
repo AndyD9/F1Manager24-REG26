@@ -46,7 +46,8 @@
 //    et aucun saut ne vise 2308575 ni 2308578). Au-dessus de la vitesse limite, sans freiner (accélération
 //    +0x19C >= 0), la cave ajoute « recharge » à xmm12 (batterie de départ). Mesuré en course à Monza :
 //    plus aucun déploiement au-delà de 290 km/h ; la fonction est appelée plusieurs fois par pas de simulation
-//    (~1 s) : recharge 0,02 par appel = ~+7 % par pas, d'où 0,005 (~2/3 du coût d'un déploiement).
+//    (~30 par seconde de simulation) : à 0,0006 par appel, +1,8 % par pas à fond au-delà de 290 km/h pour
+//    un déploiement à −3 % ; 0,0007 donne le rapport réel 250 kW / 350 kW = 0,7.
 //
 // Le fichier straight_off.txt (créé/supprimé par F7 côté Lua) remet le jeu d'origine.
 #include <windows.h>
@@ -107,7 +108,7 @@ struct ErsConfig {
     float limitBoost;           // +0x28 m/s
     float harvest;              // +0x2C batterie par appel
 };
-static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.005f };
+static ErsConfig g_cfg = { {}, 0, 290.0f / 3.6f, 337.0f / 3.6f, 0.0007f };
 #define g_boost g_cfg.boost
 struct Boost { BYTE* car; float stop; int endLap; };
 static Boost g_boostInfo[CARS];
@@ -128,7 +129,7 @@ static void Log(const char* fmt, ...) {
     fclose(f);
 }
 
-/// superclipping.ini : actif=0/1, vitesse_max=290, vitesse_max_overtake=337 (km/h), recharge=0.005
+/// superclipping.ini : actif=0/1, vitesse_max=290, vitesse_max_overtake=337 (km/h), recharge=0.0007
 static void ReadClipConfig() {
     wchar_t path[MAX_PATH];
     swprintf_s(path, L"%s\\superclipping.ini", g_dir);
@@ -139,7 +140,7 @@ static void ReadClipConfig() {
         return;
     }
     int on = 0;
-    float limit = 290.0f, limitBoost = 337.0f, harvest = 0.005f;
+    float limit = 290.0f, limitBoost = 337.0f, harvest = 0.0007f;
     char line[128];
     while (fgets(line, sizeof(line), f)) {
         sscanf_s(line, "actif=%d", &on);
@@ -155,7 +156,7 @@ static void ReadClipConfig() {
     g_cfg.harvest = harvest;
     g_cfg.clipOn = on ? 1 : 0;
     if (changed) {
-        if (on) Log("super clipping : actif, plus de déploiement au-delà de %.0f km/h (%.0f en Overtake Mode), recharge %.3f",
+        if (on) Log("super clipping : actif, plus de déploiement au-delà de %.0f km/h (%.0f en Overtake Mode), recharge %.4f",
                     limit, limitBoost, harvest);
         else Log("super clipping : désactivé");
     }

@@ -28,7 +28,7 @@ local MOD_DIR = "ue4ss/Mods/Reg2026/"
 local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
 local CSV_FILE = MOD_DIR .. "mesures.csv"
 local CLIP_FILE = MOD_DIR .. "superclipping.ini"  -- lu par Reg2026Patch.dll
-local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.005\n"
+local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.0007\n"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3
