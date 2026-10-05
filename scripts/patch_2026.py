@@ -15,8 +15,8 @@ DST = ROOT / "build" / "json"
 PATCHES = {
     "RaceSimDataAsset": [
         ("ERSAccelDeployBatteryRate", 0, -0.06, -0.10),
-        ("ERSBrakingChargeBatteryRate", 0, 0.07, 0.12),
-        ("ERSAccelerationMultiplier_Inactive", 0, 0.70, 0.66),
+        ("ERSBrakingChargeBatteryRate", 0, 0.07, 0.0875),
+        ("ERSAccelerationMultiplier_Inactive", 0, 0.70, 0.75),
         ("ERSWearRate", 0, 13.0, 15.0),
         ("SlipstreamAccelerationMultiplier", 0, 1.08, 1.10),
         ("DirtyAirMaxDist", 0, 220.0, 150.0),

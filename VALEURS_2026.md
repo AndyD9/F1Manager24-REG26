@@ -38,8 +38,8 @@ Exemple Bahreïn (3 zones) :
 | Fichier | Champ | Actuel | Proposé 2026 | Pourquoi |
 |---|---|---|---|---|
 | `RaceSimDataAsset` | `ERSAccelDeployBatteryRate` | −0,06 | **−0,10** | Règlement 2026 : 4 MJ à 350 kW durent 11,4 s, la batterie se vide en ~10 s de déploiement |
-| `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,12** | Récupération environ doublée (8,5 MJ/tour) |
-| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,66** | Sans ERS, on perd un peu plus de puissance (0,55 et 0,62 écartaient trop le peloton) |
+| `RaceSimDataAsset` | `ERSBrakingChargeBatteryRate` | 0,07 | **0,0875** | 350 kW au freinage (maximum 2026) ; 0,12 (jusqu'au 2026-10-05) gardait la batterie pleine |
+| `RaceSimDataAsset` | `ERSAccelerationMultiplier_Inactive` | 0,70 | **0,66** | Sans ERS, on perd plus de puissance (0,55 et 0,62 écartaient trop le peloton). Il fait le temps au tour : mesuré à Monza, 0,66 -> 1:29.0 de médiane, 0,80 -> 1:24.9, 1,0 -> 1:20.0, parce que l'IA ne déploie que ~10 % du temps ; 0,75 pour les temps de 2026 (vrai GP : 1:23.504 au meilleur tour en course) ; le déploiement pour le chrono seul ne suffit pas, l'énergie manque (batteries vides en deux tours) |
 | `RaceSimDataAsset` | `ERSWearRate` | 13 | 15 | Plus sollicité |
 | `DriverTacticsDataAsset` | `ERSDeployBudget` | 0,45 | **0,80** | Voulu : les pilotes utilisent plus l'électrique. Mesuré à Monza (2026-10-04, tours 3 et suivants) : aucun effet visible, 15 % du temps en déploiement et batterie moyenne 87 % avec 0,50 comme avec 0,80 ; ce n'est pas ce réglage qui limite le déploiement de l'IA |
 | `AI/RaceSimAIDataAsset` | `ERSChargingModeToggleThreshold` | 0,5 / 0,25 | 0,5 / 0,25 (inchangé) | 0,6 / 0,35 laissait l'IA en recharge trop longtemps, donc lente |

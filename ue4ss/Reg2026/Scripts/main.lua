@@ -13,7 +13,9 @@
 -- 4. Les cases STRAIGHT / OVERTAKE sont dans le bandeau des pilotes (pak zzz_Reg2026UI_P, scripts/build_ui.py) ;
 --    ici seulement un message temporaire au changement de mode.
 --
--- 5. Super clipping (optionnel) : Reg2026Patch.dll lit superclipping.ini (actif=0/1 et seuils) ; F6 le bascule.
+-- 5. Limite 2026 (plus de déploiement au-delà de 290 km/h, 337 en Overtake Mode) toujours active ; super clipping
+--    (optionnel : recharge au-dessus de la limite) : Reg2026Patch.dll lit superclipping.ini (actif=0/1 et seuils) ;
+--    F6 bascule actif.
 --
 -- Touches : F7 règlement 2026 / règle d'origine du jeu (DRS à moins d'1 s) ; F6 super clipping.
 local UEHelpers = require("UEHelpers")
@@ -29,7 +31,7 @@ local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
 local CSV_FILE = MOD_DIR .. "mesures.csv"
 local CLIP_FILE = MOD_DIR .. "superclipping.ini"  -- lu par Reg2026Patch.dll
 local CARSTATS_FILE = MOD_DIR .. "carstats.txt"    -- adresse du CarStatsDataAsset, lu par Reg2026Patch.dll
-local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.0007\n"
+local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.002\novertake_vitesse_min=250\novertake_distance=2000\novertake_ecart_attaque=0.6\novertake_batterie=1\novertake_batterie_max=0.20\ndeploiement_boost=0.40\ndeploiement_equilibre=0.60\n"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3
@@ -73,8 +75,8 @@ end
 local VALUES = {
     { "/Game/RaceSim/RaceSimDataAsset.RaceSimDataAsset", {
         { "ERSAccelDeployBatteryRate", -0.10 },
-        { "ERSBrakingChargeBatteryRate", 0.12 },
-        { "ERSAccelerationMultiplier_Inactive", 0.66 },
+        { "ERSBrakingChargeBatteryRate", 0.0875 },  -- 350 kW (0,12 gardait la batterie pleine)
+        { "ERSAccelerationMultiplier_Inactive", 0.75 },  -- temps 2026 à Monza (0,66 : 1:29.0 de médiane, 0,80 : 1:24.9)
         { "ERSWearRate", 15.0 },
         { "SlipstreamAccelerationMultiplier", 1.10 },
         { "DirtyAirMaxDist", 150.0 },
@@ -390,8 +392,8 @@ end
 RegisterKeyBind(Key.F6, {}, function()
     local on = toggleClipping()
     log("super clipping : " .. (on and "actif" or "désactivé"))
-    showToast(on and "Super clipping : plus d'électrique à haute vitesse, recharge en bout de ligne droite"
-        or "Super clipping désactivé",
+    showToast(on and "Super clipping : recharge en bout de ligne droite"
+        or "Super clipping désactivé (limite de 290 km/h gardée)",
         on and COLOR_ON or COLOR_WARN)
 end)
 

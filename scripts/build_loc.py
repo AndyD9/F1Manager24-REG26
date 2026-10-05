@@ -20,10 +20,10 @@ OUT = ROOT / "build" / "out" / "zzz_Reg2026Loc_P.pak"
 RENAMES = {
     "ERS_OVERTAKE": ("Dépassement", "Overtake Mode"),
     "TEAM_COMMS_TYPE_142": ("Dépassement avec ERS autorisé", "Overtake Mode disponible"),
-    "NOTIFICATIONS_DRS_ENABLED": ("DRS activé", "Straight Mode activé"),
-    "NOTIFICATIONS_DRS_DISABLED": ("DRS désactivé", "Straight Mode désactivé"),
-    "TEAM_COMMS_TYPE_33": ("DRS activé", "Straight Mode activé"),
-    "TEAM_COMMS_TYPE_34": ("DRS désactivé", "Straight Mode désactivé"),
+    "NOTIFICATIONS_DRS_ENABLED": ("DRS activé", "Overtake Mode activé"),  # le jeu ouvre le DRS 2 tours après le départ ou une relance : le Straight Mode est là dès le 1er tour, c'est l'Overtake Mode qui arrive
+    "NOTIFICATIONS_DRS_DISABLED": ("DRS désactivé", "Overtake Mode désactivé"),
+    "TEAM_COMMS_TYPE_33": ("DRS activé", "Overtake Mode activé"),
+    "TEAM_COMMS_TYPE_34": ("DRS désactivé", "Overtake Mode désactivé"),
     "TEAM_COMMS_TYPE_197": ("Voiture derrière avec DRS", "Voiture derrière avec Overtake Mode"),
     "TEAM_COMMS_TYPE_202": ("Voiture derrière sans DRS", "Voiture derrière sans Overtake Mode"),
     "CIRCUIT_INFO_DRS_ZONE": ("Zone DRS", "Zone Straight Mode"),

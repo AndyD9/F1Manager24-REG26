@@ -1,6 +1,7 @@
 # Construit les deux zips d'une version, à décompresser dans le dossier du jeu :
-#   Reg2026_vX.Y.Z.zip                : super clipping désactivé (superclipping.ini : actif=0)
-#   Reg2026_vX.Y.Z_superclipping.zip  : super clipping activé (actif=1) ; seule différence
+#   Reg2026_vX.Y.Z.zip                : super clipping désactivé (superclipping.ini : actif=0 ; la limite de 290 km/h
+#                                       reste active)
+#   Reg2026_vX.Y.Z_superclipping.zip  : super clipping activé (actif=1 : recharge au-dessus de la limite) ; seule différence
 # Les paks viennent de build\out (scripts\build_install.ps1 et scripts\build_ui.py), la DLL et les scripts de ue4ss\Reg2026
 # (tools_native\build.bat). Usage : .\scripts\build_release.ps1 0.4.0
 param([Parameter(Mandatory = $true)][string] $Version)
@@ -15,7 +16,7 @@ $modFiles = @('enabled.txt', 'Reg2026Patch.dll', 'Scripts\main.lua', 'Scripts\zo
 foreach ($f in $paks) { if (-not (Test-Path "$out\$f")) { throw "manque $out\$f" } }
 foreach ($f in $modFiles) { if (-not (Test-Path "$mod\$f")) { throw "manque $mod\$f" } }
 
-$clip = "vitesse_max=290`nvitesse_max_overtake=337`nrecharge=0.0007`n"
+$clip = "vitesse_max=290`nvitesse_max_overtake=337`nrecharge=0.002`novertake_vitesse_min=250`novertake_distance=2000`novertake_ecart_attaque=0.6`novertake_batterie=1`novertake_batterie_max=0.20`ndeploiement_boost=0.40`ndeploiement_equilibre=0.60`n"
 foreach ($variant in @(@{ suffix = ''; actif = 0 }, @{ suffix = '_superclipping'; actif = 1 })) {
     $name = "Reg2026_v$Version$($variant.suffix)"
     $dir = "$release\v$Version\$name"

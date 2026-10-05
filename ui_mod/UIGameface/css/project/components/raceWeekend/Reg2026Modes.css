@@ -39,12 +39,12 @@
   left: 0;
   bottom: 100%;
   width: 31.1111111111rem;
-  height: 1.7777777778rem;
+  height: 2.8888888889rem;
   margin-bottom: 0.2222222222rem;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   background-color: rgba(var(--interactive-triplet), 0.9);
   border-top-left-radius: 0.1111111111rem;
   border-top-right-radius: 0.1111111111rem;
@@ -54,6 +54,47 @@
   border-bottom-style: solid;
   border-bottom-width: 0.1111111111rem;
   pointer-events: none;
+}
+/* ligne du bas : vitesse, batterie, ERS */
+.Reg2026Telemetry_row {
+  height: 1.7777777778rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+/* ligne du haut : jauge OVERTAKE (crédit d'énergie restant), allumée pendant le déploiement forcé */
+.Reg2026Overtake_row {
+  height: 1.1111111111rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 0.4444444444rem;
+  padding-right: 0.4444444444rem;
+  border-bottom-color: rgba(var(--whiteColor-triplet), 0.15);
+  border-bottom-style: solid;
+  border-bottom-width: 0.0555555556rem;
+}
+.Reg2026Overtake_row.unknown {
+  opacity: 0.4;
+}
+.Reg2026Overtake_bar {
+  position: relative;
+  flex-grow: 1;
+  height: 0.4444444444rem;
+  margin-left: 0.4444444444rem;
+  margin-right: 0.4444444444rem;
+  background-color: rgba(var(--whiteColor-triplet), 0.15);
+}
+.Reg2026Overtake_barFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(var(--ersColor-triplet), 0.5);
+}
+.Reg2026Overtake_barFill.active {
+  background-color: var(--ersColor);
 }
 .Reg2026Telemetry_cell {
   display: flex;
@@ -73,6 +114,16 @@
   width: 11.6666666667rem;
   justify-content: flex-end;
   margin-right: 0.4444444444rem;
+}
+.Reg2026Telemetry_value.small {
+  font-size: var(--fontSize14);
+}
+.Reg2026Telemetry_state.ovt {
+  flex-shrink: 0;
+}
+.Reg2026Telemetry_state.ovt.active {
+  color: var(--ersColor);
+  opacity: 1;
 }
 .Reg2026Telemetry_value {
   font-family: F1Font;

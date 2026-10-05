@@ -1,6 +1,7 @@
 """Charge hwbp.dll dans F1Manager24.exe et analyse le résultat.
 
-  python tools_native/inject.py target <adresse_hex>   -> écrit hwbp_target.txt
+  python tools_native/inject.py target <adresse_hex>   -> écrit hwbp_target.txt (« adresse w|r|x taille »)
+  HWBP_DLL=chemin : copie de la DLL sous un autre nom si hwbp.dll est déjà chargée dans ce processus
   python tools_native/inject.py inject                 -> charge la DLL (attend la fin, ~15 s)
   python tools_native/inject.py show                   -> désassemble chaque instruction trouvée
 """
@@ -12,7 +13,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DLL = HERE / "build" / "hwbp.dll"
+DLL = Path(os.environ.get("HWBP_DLL", HERE / "build" / "hwbp.dll"))  # autre nom si déjà chargée dans ce processus
 TARGET = HERE / "build" / "hwbp_target.txt"
 LOG = HERE / "build" / "hwbp_log.txt"
 EXE = os.environ.get("HWBP_EXE", "F1Manager24.exe")
@@ -71,13 +72,20 @@ def inject():
         sys.exit(f"CreateRemoteThread impossible ({ctypes.get_last_error()})")
     k32.WaitForSingleObject(t, 10000)
     print(f"DLL chargée dans le processus {pid}, enregistrement en cours…")
-    for _ in range(60):
+    wait = 60
+    try:
+        parts = TARGET.read_text().split()
+        if len(parts) >= 4:
+            wait = int(parts[3]) // 1000 + 30
+    except (OSError, ValueError):
+        pass
+    for _ in range(wait):
         if LOG.exists():
             time.sleep(0.5)
             print(f"-> {LOG}")
             return
         time.sleep(1)
-    print("pas de journal après 60 s")
+    print(f"pas de journal après {wait} s")
 
 
 def show():

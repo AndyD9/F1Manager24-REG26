@@ -12,8 +12,8 @@ Les changements agissent sur la simulation elle-même, pas seulement sur l'affic
 |---|---|---|
 | **Straight Mode** | Ailerons ouverts dans les zones, pour toutes les voitures, à chaque tour | Toute la grille a l'aileron ouvert dans les zones, dès le 1er tour. Pas en cas de voiture de sécurité, de drapeau ou de pluie. |
 | **Zones** | Désignées par la FIA | Nombre de zones annoncé par la FIA pour chaque circuit (Monza 4, Spa 5, Suzuka 2…) |
-| **Overtake Mode** | À moins d'1 s de la voiture devant : 0,5 MJ d'énergie en plus | +12,5 % de batterie, que la voiture dépense aussitôt à pleine puissance électrique |
-| **ERS** | 350 kW, environ 50 % de la puissance | Plus de puissance électrique, batterie vide en ~10 s de déploiement, recharge plus forte |
+| **Overtake Mode** | À moins d'1 s de la voiture devant : 0,5 MJ d'énergie en plus | 12,5 % d'énergie en plus de la batterie, gardés jusqu'à une vraie occasion (voiture devant à moins de 0,6 s, au plus jusqu'à la fin du tour suivant). Alors : pleine puissance électrique jusqu'à 337 km/h (les autres s'arrêtent à 290), payée par le crédit puis par la batterie (20 % au plus), jusqu'au freinage, et l'avantage au dépassement que le jeu réservait au DRS (2 km après chaque détection). Jauge OVERTAKE au-dessus du bandeau de chaque pilote : crédit restant sur 0,50 MJ, allumée pendant l'utilisation. Notification « Overtake Mode activé » quand il devient disponible (2 tours après le départ ou une relance) |
+| **ERS** | 350 kW, environ 50 % de la puissance, 8,5 MJ récupérés par tour | Batterie vide en ~10 s de déploiement, recharge de 350 kW au freinage et de 250 kW en bout de ligne droite (super clipping). Les pilotes déploient à fond en accélération pour le chrono (stratégies Boost et Équilibré). Mesuré à Monza : 1:26.0 de médiane, 1:22.9 au meilleur tour (vrai GP 2026 : 1:23.5) |
 | **Aéro** | Appui −30 %, voitures plus légères | Un peu moins de vitesse en virage (surtout les rapides), moins d'air sale derrière une voiture |
 | **Gestion de l'énergie** | Boost manuel, récupération au lever de pied, « clipping » en bout de ligne droite | Les quatre stratégies ERS deviennent **Boost**, **Équilibré**, **Réserve** et **Lift & Coast** (voir plus bas) |
 
@@ -30,17 +30,18 @@ Dans l'écran Stratégies ERS, les quatre réglages du jeu sont renommés et deu
 
 | Stratégie 2026 | Réglage d'origine | Comportement |
 |---|---|---|
-| **Boost** | Déploiement | Celui du jeu : c'est la stratégie de course de l'IA. |
-| **Équilibré** | Neutre | Celui du jeu. |
-| **Réserve** | Top-Up | Le pilote garde son énergie : pas de déploiement, sauf en Overtake Mode ou pour défendre quand une voiture est à moins d'1 s derrière. |
+| **Boost** | Déploiement | Le pilote déploie à fond en accélération (sous 290 km/h) tant que sa batterie est au-dessus de 40 %, pour le chrono. C'est la stratégie de course de l'IA. |
+| **Équilibré** | Neutre | Pareil, mais seulement au-dessus de 60 % de batterie. |
+| **Réserve** | Top-Up | Le pilote garde son énergie : pas de déploiement, sauf en Overtake Mode ou en bataille (une voiture à moins d'1 s devant ou derrière). |
 | **Lift & Coast** | Récupération | Plus d'électrique au-delà de 250 km/h et recharge au-dessus : la batterie se remplit en bout de ligne droite. |
 
 ### Super clipping (optionnel)
 
-En 2026, la puissance électrique est réduite à haute vitesse et la batterie se recharge en bout de ligne droite. Le zip
-`Reg2026_vX.Y.Z_superclipping.zip` active cette règle pour toute la grille : plus de déploiement au-delà de 290 km/h
-(337 km/h en Overtake Mode) et recharge au-dessus. Les courses sont plus serrées en ligne droite, mais l'IA ne le prévoit
-pas dans sa gestion de batterie. **F6** en jeu l'active ou le coupe à tout moment.
+En 2026, la puissance électrique est réduite à haute vitesse : dans les deux zips, plus personne ne déploie au-delà de
+290 km/h, sauf une voiture en Overtake Mode (jusqu'à 337 km/h, avec son crédit d'énergie). C'est ce qui donne à
+l'Overtake Mode son avantage en vitesse de pointe. Le zip `Reg2026_vX.Y.Z_superclipping.zip` ajoute la recharge en bout
+de ligne droite (au-delà de la limite, à fond) ; l'IA ne la prévoit pas dans sa gestion de batterie. **F6** en jeu
+l'active ou la coupe à tout moment (la limite de vitesse reste).
 
 Le détail du règlement et de chaque réglage est dans [REGLEMENT_2026.md](REGLEMENT_2026.md).
 
@@ -79,7 +80,7 @@ F1Manager24\Binaries\Win64\ue4ss\Mods\Reg2026\  le mod (scripts et Reg2026Patch.
 
 - **F7** : passe du règlement 2026 à la règle d'origine du jeu (DRS à moins d'1 s, après 2 tours), et inversement.
   Un message s'affiche à l'écran. Les valeurs ERS et aéro restent celles de 2026.
-- **F6** : active ou coupe le super clipping (voir plus haut). Le réglage est gardé d'une partie à l'autre
+- **F6** : active ou coupe le super clipping, c'est-à-dire la recharge en bout de ligne droite (voir plus haut). Le réglage est gardé d'une partie à l'autre
   (`Mods\Reg2026\superclipping.ini`).
 
 ## Mise à jour

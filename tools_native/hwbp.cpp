@@ -2,17 +2,18 @@
 // quand une instruction s'exécute.
 //
 // Chargée dans F1Manager24.exe par inject.py. Lit hwbp_target.txt (« adresse [w|x] [taille] », à côté de
-// la DLL), pose un point d'arrêt matériel (DR0) sur tous les threads : en écriture (w, 1/2/4/8 octets) ou à
-// l'exécution (x). Note chaque instruction concernée pendant DURATION_MS, puis retire le point d'arrêt et écrit
-// hwbp_log.txt : adresse de l'instruction, nombre de passages, registres des premiers passages, code autour.
+// la DLL), pose un point d'arrêt matériel (DR0) sur tous les threads : en écriture (w, 1/2/4/8 octets), en
+// lecture ou écriture (r) ou à l'exécution (x). Note chaque instruction concernée pendant DURATION_MS, puis retire le point d'arrêt et écrit
+// hwbp_log.txt : adresse de l'instruction, nombre de passages, registres des 64 premiers passages, code autour.
+// Format de hwbp_target.txt : « adresse [w|r|x] [taille] [durée_ms] ».
 // La DLL se décharge ensuite d'elle-même.
 #include <windows.h>
 #include <tlhelp32.h>
 #include <stdio.h>
 
-static const DWORD DURATION_MS = 15000;
+static DWORD g_durationMs = 15000;  // 4e champ de hwbp_target.txt (ms), 15 s par défaut
 static const int MAX_SITES = 64;
-static const int MAX_CTX = 8;
+static const int MAX_CTX = 64;
 
 struct Site {
     DWORD64 rip;
@@ -25,6 +26,7 @@ static volatile LONG g_siteCount = 0;
 static volatile LONG g_lost = 0;
 static DWORD64 g_target = 0;
 static bool g_exec = false;
+static bool g_read = false;  // r : lecture ou écriture
 static DWORD64 g_len = 1;
 static HMODULE g_self = nullptr;
 static wchar_t g_dir[MAX_PATH];
@@ -73,7 +75,7 @@ static void SetBreakpointOnAllThreads(bool enable) {
             if (GetThreadContext(t, &c)) {
                 if (enable) {
                     DWORD64 len = g_len == 8 ? 2 : g_len == 4 ? 3 : g_len == 2 ? 1 : 0;
-                    DWORD64 rw = g_exec ? 0 : 1;  // 00 exécution, 01 écriture
+                    DWORD64 rw = g_exec ? 0 : g_read ? 3 : 1;  // 00 exécution, 01 écriture, 11 lecture/écriture
                     c.Dr0 = g_target;
                     c.Dr7 = (c.Dr7 & ~0xF0003ull) | 1ull | (rw << 16) | ((g_exec ? 0 : len) << 18);
                 } else {
@@ -133,14 +135,16 @@ static DWORD WINAPI Worker(LPVOID) {
     FILE* f = nullptr;
     if (_wfopen_s(&f, path, L"r") == 0 && f) {
         char mode[4] = "w";
-        fscanf_s(f, "%llx %3s %llu", &g_target, mode, (unsigned)sizeof(mode), &g_len);
+        fscanf_s(f, "%llx %3s %llu %lu", &g_target, mode, (unsigned)sizeof(mode), &g_len, &g_durationMs);
+        if (g_durationMs < 1000 || g_durationMs > 600000) g_durationMs = 15000;
         g_exec = mode[0] == 'x';
+        g_read = mode[0] == 'r';
         fclose(f);
     }
     if (g_target) {
         PVOID veh = AddVectoredExceptionHandler(1, OnException);
         SetBreakpointOnAllThreads(true);
-        Sleep(DURATION_MS);
+        Sleep(g_durationMs);
         SetBreakpointOnAllThreads(false);
         Sleep(200);
         RemoveVectoredExceptionHandler(veh);
