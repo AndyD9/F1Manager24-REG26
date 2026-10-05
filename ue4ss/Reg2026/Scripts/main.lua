@@ -31,7 +31,7 @@ local OFF_FILE = MOD_DIR .. "straight_off.txt"   -- lu par Reg2026Patch.dll
 local CSV_FILE = MOD_DIR .. "mesures.csv"
 local CLIP_FILE = MOD_DIR .. "superclipping.ini"  -- lu par Reg2026Patch.dll
 local CARSTATS_FILE = MOD_DIR .. "carstats.txt"    -- adresse du CarStatsDataAsset, lu par Reg2026Patch.dll
-local CLIP_DEFAULT = "actif=0\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.002\novertake_vitesse_min=250\novertake_distance=2000\novertake_ecart_attaque=0.6\novertake_batterie=1\novertake_batterie_max=0.20\ndeploiement_boost=0.40\ndeploiement_equilibre=0.60\n"
+local CLIP_DEFAULT = "actif=1\nvitesse_max=290\nvitesse_max_overtake=337\nrecharge=0.002\novertake_vitesse_min=250\novertake_distance=2000\novertake_ecart_attaque=0.6\novertake_batterie=1\novertake_batterie_max=0.20\ndeploiement_boost=0.40\ndeploiement_equilibre=0.60\n"
 
 -- EDRSState
 local DRS_DISABLED, DRS_DETECTED, DRS_ENABLED, DRS_ACTIVE = 0, 1, 2, 3

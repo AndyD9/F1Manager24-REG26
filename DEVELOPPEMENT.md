@@ -30,10 +30,10 @@ Cette page concerne le code source.
 
 ## Release
 
-Deux zips qui reprennent l'arborescence du jeu, à décompresser dans le dossier du jeu, construits par
+Un zip qui reprend l'arborescence du jeu, à décompresser dans le dossier du jeu, construit par
 `scripts/build_release.ps1 X.Y.Z` (depuis `build/out` et `ue4ss/Reg2026`) dans `build/release/` :
-`Reg2026_vX.Y.Z.zip` et `Reg2026_vX.Y.Z_superclipping.zip`, dont la seule différence est `actif=0` / `actif=1`
-dans `superclipping.ini`.
+`Reg2026_vX.Y.Z.zip`, super clipping actif (`actif=1` dans `superclipping.ini`). Jusqu'à la v0.4.0, il y avait
+aussi un zip sans super clipping ; le déploiement pour le chrono de la v0.4.1 est calé avec la recharge.
 
 ```
 F1Manager24/Content/Paks/                      zzz_Reg2026_P.pak/.ucas/.utoc, zzz_Reg2026UI_P.pak

@@ -35,13 +35,13 @@ Dans l'écran Stratégies ERS, les quatre réglages du jeu sont renommés et deu
 | **Réserve** | Top-Up | Le pilote garde son énergie : pas de déploiement, sauf en Overtake Mode ou en bataille (une voiture à moins d'1 s devant ou derrière). |
 | **Lift & Coast** | Récupération | Plus d'électrique au-delà de 250 km/h et recharge au-dessus : la batterie se remplit en bout de ligne droite. |
 
-### Super clipping (optionnel)
+### Super clipping
 
-En 2026, la puissance électrique est réduite à haute vitesse : dans les deux zips, plus personne ne déploie au-delà de
-290 km/h, sauf une voiture en Overtake Mode (jusqu'à 337 km/h, avec son crédit d'énergie). C'est ce qui donne à
-l'Overtake Mode son avantage en vitesse de pointe. Le zip `Reg2026_vX.Y.Z_superclipping.zip` ajoute la recharge en bout
-de ligne droite (au-delà de la limite, à fond) ; l'IA ne la prévoit pas dans sa gestion de batterie. **F6** en jeu
-l'active ou la coupe à tout moment (la limite de vitesse reste).
+En 2026, la puissance électrique est réduite à haute vitesse : plus personne ne déploie au-delà de 290 km/h, sauf une
+voiture en Overtake Mode (jusqu'à 337 km/h). C'est ce qui donne à l'Overtake Mode son avantage en vitesse de pointe.
+Au-delà de la limite, à fond, la batterie se recharge (250 kW, le super clipping) : c'est elle qui paie le déploiement
+de la ligne droite suivante. **F6** en jeu coupe ou remet cette recharge (la limite de vitesse reste) ; sans elle, les
+batteries se vident et l'IA passe en Réserve.
 
 Le détail du règlement et de chaque réglage est dans [REGLEMENT_2026.md](REGLEMENT_2026.md).
 
@@ -59,8 +59,7 @@ Le détail du règlement et de chaque réglage est dans [REGLEMENT_2026.md](REGL
 ## Installation
 
 1. Ouvre le dossier du jeu : dans Steam, clic droit sur **F1 Manager 2024** → **Gérer** → **Parcourir les fichiers locaux**.
-2. Télécharge `Reg2026_vX.Y.Z.zip` depuis la [dernière version](https://github.com/AndyD9/F1Manager24-REG26/releases/latest)
-   (ou `Reg2026_vX.Y.Z_superclipping.zip` : même mod, avec le super clipping activé d'avance).
+2. Télécharge `Reg2026_vX.Y.Z.zip` depuis la [dernière version](https://github.com/AndyD9/F1Manager24-REG26/releases/latest).
 3. Décompresse-le **dans ce dossier** (celui qui contient `F1Manager24`) et accepte de fusionner les dossiers.
 
 C'est tout. Le zip contient déjà la bonne arborescence :
